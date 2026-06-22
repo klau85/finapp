@@ -1,0 +1,28 @@
+{% if marketDataAvailable is defined and not marketDataAvailable %}
+    <p class="text-secondary mb-0">Unavailable</p>
+{% elseif items %}
+    <div class="table-responsive">
+        <table class="table table-hover-pop align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th class="text-end">Total P/L</th>
+                    <th class="text-end">Total P/L %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr>
+                        <td>
+                            <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: item.symbol }) }}">{{ item.symbol }}</a>
+                        </td>
+                        <td class="text-end {{ item.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">{{ item.totalGain|money_symbol(item.currency) }}</td>
+                        <td class="text-end {{ item.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">{{ item.totalGainPercent|trim_number }}%</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <p class="text-secondary mb-0">No open positions.</p>
+{% endif %}

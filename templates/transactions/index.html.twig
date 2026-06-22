@@ -1,0 +1,150 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Transactions | FinApp{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">User scoped ledger</div>
+            <h1 class="h2 mb-0">Transactions</h1>
+        </div>
+        <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload CSV</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-2">
+                    <label for="symbol" class="form-label">Symbol</label>
+                    <input id="symbol" name="symbol" class="form-control" value="{{ filters.symbol }}" placeholder="NVDA">
+                </div>
+                <div class="col-md-3">
+                    <label for="brokerAccountId" class="form-label">Broker Account</label>
+                    <select id="brokerAccountId" name="brokerAccountId" class="form-select">
+                        <option value="">All accounts</option>
+                        {% for account in brokerAccounts %}
+                            <option value="{{ account.id }}" {{ filters.brokerAccountId == account.id ? 'selected' }}>
+                                {{ account.displayName }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="type" class="form-label">Type</label>
+                    <select id="type" name="type" class="form-select">
+                        <option value="">BUY/SELL</option>
+                        <option value="BUY" {{ filters.type == 'BUY' ? 'selected' }}>BUY</option>
+                        <option value="SELL" {{ filters.type == 'SELL' ? 'selected' }}>SELL</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="dateFrom" class="form-label">From</label>
+                    <input id="dateFrom" name="dateFrom" type="date" class="form-control" value="{{ filters.dateFrom }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="dateTo" class="form-label">To</label>
+                    <input id="dateTo" name="dateTo" type="date" class="form-control" value="{{ filters.dateTo }}">
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button class="btn btn-dark" type="submit">Filter</button>
+                </div>
+                <div class="col-12">
+                    <a class="small text-secondary" href="{{ path('app_transactions') }}">Clear filters</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if transactions %}
+                <div class="table-responsive">
+                    <table class="table table-hover-pop align-middle">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Broker Account</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th class="text-end">Quantity</th>
+                                <th class="text-end">Price</th>
+                                <th class="text-end">Fees</th>
+                                <th>Currency</th>
+                                <th class="text-end">Total amount</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in transactions %}
+                                {% set transaction = row.entity %}
+                                {% set stock = transaction.stock %}
+                                {% set brokerAccount = transaction.brokerAccount %}
+                                <tr>
+                                    <td>{{ transaction.transactionDate|date('Y-m-d') }}</td>
+                                    <td>{{ brokerAccount.displayName }}</td>
+                                    <td>
+                                        <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: stock.symbol }) }}">
+                                            {{ stock.symbol }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if transaction.type == 'BUY' %}
+                                            <span class="badge badge-buy">BUY</span>
+                                        {% else %}
+                                            <span class="badge badge-sell">SELL</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ transaction.quantity|trim_number }}</td>
+                                    <td class="text-end">{{ transaction.price|money_symbol(transaction.currency) }}</td>
+                                    <td class="text-end">{{ transaction.fees|money_symbol(transaction.currency) }}</td>
+                                    <td>{{ transaction.currency }}</td>
+                                    <td class="text-end">{{ row.totalAmount|money_symbol(transaction.currency) }}</td>
+                                    <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTransaction{{ transaction.id }}">
+                                            Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% for row in transactions %}
+                    {% set transaction = row.entity %}
+                    {% set stock = transaction.stock %}
+                    {% set brokerAccount = transaction.brokerAccount %}
+                    <div class="modal fade" id="deleteTransaction{{ transaction.id }}" tabindex="-1" aria-labelledby="deleteTransaction{{ transaction.id }}Label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h2 class="modal-title fs-5" id="deleteTransaction{{ transaction.id }}Label">Delete transaction</h2>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-2">
+                                        Delete this <strong>{{ transaction.type }}</strong> transaction for
+                                        <strong>{{ transaction.quantity|trim_number }} {{ stock.symbol }}</strong>
+                                        in <strong>{{ brokerAccount.displayName }}</strong>?
+                                    </p>
+                                    <p class="text-secondary mb-0">FIFO lots and portfolio metrics will be recalculated after deletion.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <form method="post" action="{{ path('app_transaction_delete', { id: transaction.id }) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete_transaction_' ~ transaction.id) }}">
+                                        <button type="submit" class="btn btn-danger">Delete transaction</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="border rounded-3 p-4 text-secondary">
+                    No transactions match the current filters.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

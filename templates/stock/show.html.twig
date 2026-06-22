@@ -1,0 +1,326 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ symbol }} | FinApp{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .chart-event-strip {
+            display: grid;
+            gap: .75rem;
+            grid-auto-columns: minmax(220px, 280px);
+            grid-auto-flow: column;
+            overflow-x: auto;
+            padding-bottom: .25rem;
+        }
+
+        .chart-event-card {
+            background: #f8fafc;
+            border: 1px solid var(--app-border);
+            border-radius: 8px;
+            cursor: pointer;
+            padding: .75rem;
+            text-align: left;
+            transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+        }
+
+        .chart-event-card:hover,
+        .chart-event-card.is-active {
+            background: #ffffff;
+            border-color: #94a3b8;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, .1);
+        }
+
+        .chart-event-detail {
+            color: #374151;
+            font-size: .875rem;
+            line-height: 1.35;
+        }
+    </style>
+{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">Stock page</div>
+            <h1 class="h2 mb-0">{{ symbol }}</h1>
+            <div class="text-secondary">{{ companyName ?: 'Company name not available' }}</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="btn-group" role="group" aria-label="Chart timeframe">
+                <a class="btn btn-sm {{ timeframe == 'daily' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'daily' }) }}">1D</a>
+                <a class="btn btn-sm {{ timeframe == 'weekly' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'weekly' }) }}">1W</a>
+            </div>
+            <a class="btn btn-outline-secondary" href="{{ path('app_portfolio') }}">Back to portfolio</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            {% if chartUnavailable %}
+                <div class="border rounded-3 p-4 text-secondary">Chart data is unavailable at this moment.</div>
+            {% endif %}
+            <div id="stock-chart" style="height: 460px;" class="{{ chartUnavailable ? 'd-none' : '' }}"></div>
+            {% if not chartUnavailable and markers %}
+                <div class="mt-3">
+                    <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+                        <h2 class="h6 mb-0">Transactions on chart</h2>
+                        <div class="small text-secondary">Select an event to read the full details.</div>
+                    </div>
+                    <div id="chart-transaction-events" class="chart-event-strip" aria-label="Transactions on chart">
+                        {% for marker in markers %}
+                            <button type="button" class="chart-event-card" data-event-time="{{ marker.time }}">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                                    <span class="small fw-semibold">{{ marker.time }}</span>
+                                    <span class="badge {{ marker.type == 'BUY' ? 'badge-buy' : 'badge-sell' }}">{{ marker.text }}</span>
+                                </div>
+                                {% for detail in marker.details %}
+                                    <div class="chart-event-detail">{{ detail }}</div>
+                                {% endfor %}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Total Shares</div>
+                    <div class="h3 mb-0">{{ position ? position.totalShares|trim_number : '0' }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Market Value</div>
+                    <div class="h3 mb-0">
+                        {{ position and position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Realized P/L</div>
+                    <div class="h3 mb-0 {{ position and position.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                        {{ position ? position.realizedGain|money_symbol(position.currency) : '$0' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Unrealized P/L</div>
+                    <div class="h3 mb-0 {{ position and position.marketDataAvailable and position.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                        {{ position and position.marketDataAvailable ? position.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Position summary</h2>
+                    {% if position %}
+                        <dl class="row mb-0">
+                            <dt class="col-6 text-secondary">Average cost</dt>
+                            <dd class="col-6 text-end">{{ position.averageCost|money_symbol(position.currency) }}</dd>
+                            <dt class="col-6 text-secondary">Current price</dt>
+                            <dd class="col-6 text-end">{{ position.marketDataAvailable ? position.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</dd>
+                            <dt class="col-6 text-secondary">Total P/L</dt>
+                            <dd class="col-6 text-end {{ position.marketDataAvailable and position.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                {{ position.marketDataAvailable ? position.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                            </dd>
+                            <dt class="col-6 text-secondary">Total P/L %</dt>
+                            <dd class="col-6 text-end {{ position.marketDataAvailable and position.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                {{ position.marketDataAvailable ? position.totalGainPercent|trim_number ~ '%' : 'Unavailable' }}
+                            </dd>
+                        </dl>
+                    {% else %}
+                        <p class="text-secondary mb-0">No open position. Raw transactions are still shown below.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Broker account breakdown</h2>
+                    {% if position and position.breakdown %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover-pop mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Broker account</th>
+                                        <th class="text-end">Shares</th>
+                                        <th class="text-end">Realized P/L</th>
+                                        <th class="text-end">Unrealized P/L</th>
+                                        <th class="text-end">Total P/L</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for breakdown in position.breakdown %}
+                                        <tr>
+                                            <td>{{ breakdown.brokerAccount }}</td>
+                                            <td class="text-end">{{ breakdown.shares|trim_number }}</td>
+                                            <td class="text-end {{ breakdown.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">{{ breakdown.realizedGain|money_symbol(position.currency) }}</td>
+                                            <td class="text-end {{ breakdown.marketDataAvailable and breakdown.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                                            </td>
+                                            <td class="text-end {{ breakdown.marketDataAvailable and breakdown.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                {{ breakdown.marketDataAvailable ? breakdown.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-secondary mb-0">No open broker-account lots for this stock.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Transaction history</h2>
+            <div class="table-responsive">
+                <table class="table table-hover-pop align-middle">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Broker Account</th>
+                            <th>Type</th>
+                            <th class="text-end">Quantity</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-end">Fees</th>
+                            <th>Currency</th>
+                            <th class="text-end">Total amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ transaction.date }}</td>
+                                <td>{{ transaction.brokerAccount }}</td>
+                                <td>
+                                    {% if transaction.type == 'BUY' %}
+                                        <span class="badge badge-buy">BUY</span>
+                                    {% else %}
+                                        <span class="badge badge-sell">SELL</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ transaction.quantity|trim_number }}</td>
+                                <td class="text-end">{{ transaction.price|money_symbol(transaction.currency) }}</td>
+                                <td class="text-end">{{ transaction.fees|money_symbol(transaction.currency) }}</td>
+                                <td>{{ transaction.currency }}</td>
+                                <td class="text-end">{{ transaction.totalAmount|money_symbol(transaction.currency) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('stock-chart');
+            const eventStrip = document.getElementById('chart-transaction-events');
+            const candles = {{ candles|json_encode|raw }};
+            const markers = {{ markers|json_encode|raw }};
+            const chartMarkers = markers.map(({ time, position, color, shape, text }) => ({ time, position, color, shape, text }));
+
+            if (!container || !window.LightweightCharts || candles.length === 0) {
+                return;
+            }
+
+            const chart = LightweightCharts.createChart(container, {
+                autoSize: true,
+                layout: {
+                    background: { type: 'solid', color: '#ffffff' },
+                    textColor: '#111827'
+                },
+                grid: {
+                    vertLines: { color: '#eef2f7' },
+                    horzLines: { color: '#eef2f7' }
+                },
+                rightPriceScale: {
+                    borderColor: '#e5e7eb'
+                },
+                timeScale: {
+                    borderColor: '#e5e7eb',
+                    timeVisible: true
+                }
+            });
+
+            const series = chart.addSeries(LightweightCharts.CandlestickSeries, {
+                upColor: '#16a34a',
+                downColor: '#dc2626',
+                borderVisible: false,
+                wickUpColor: '#16a34a',
+                wickDownColor: '#dc2626'
+            });
+
+            series.setData(candles);
+
+            if (typeof LightweightCharts.createSeriesMarkers === 'function') {
+                LightweightCharts.createSeriesMarkers(series, chartMarkers);
+            } else if (typeof series.setMarkers === 'function') {
+                series.setMarkers(chartMarkers);
+            }
+
+            const eventButtons = eventStrip ? Array.from(eventStrip.querySelectorAll('[data-event-time]')) : [];
+            const setActiveEvent = (time) => {
+                let active = null;
+                eventButtons.forEach((button) => {
+                    const selected = button.dataset.eventTime === time;
+                    button.classList.toggle('is-active', selected);
+                    if (selected && active === null) {
+                        active = button;
+                    }
+                });
+
+                if (active !== null) {
+                    active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }
+            };
+
+            eventButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    setActiveEvent(button.dataset.eventTime);
+                });
+            });
+
+            chart.subscribeCrosshairMove((param) => {
+                if (!param.time) {
+                    return;
+                }
+
+                const time = typeof param.time === 'string'
+                    ? param.time
+                    : `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`;
+                setActiveEvent(time);
+            });
+
+            chart.timeScale().fitContent();
+        });
+    </script>
+{% endblock %}

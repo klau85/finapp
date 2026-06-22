@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{% block title %}FinApp{% endblock %}</title>
+        <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f2937'/%3E%3Cpath d='M15 42h34M18 36l8-8 7 6 13-15' stroke='%2322c55e' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+        {% block stylesheets %}
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                :root {
+                    --app-bg: #f4f6f8;
+                    --app-border: #e5e7eb;
+                    --app-sidebar: #111827;
+                    --app-muted: #6b7280;
+                }
+
+                body {
+                    background: var(--app-bg);
+                    color: #111827;
+                    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    letter-spacing: 0;
+                }
+
+                .app-shell {
+                    min-height: 100vh;
+                }
+
+                .app-sidebar {
+                    background: var(--app-sidebar);
+                    color: #fff;
+                    width: 260px;
+                }
+
+                .app-sidebar .nav-link {
+                    border-radius: 8px;
+                    color: #cbd5e1;
+                    font-weight: 500;
+                    padding: .7rem .85rem;
+                }
+
+                .app-sidebar .nav-link:hover,
+                .app-sidebar .nav-link.active {
+                    background: rgba(255, 255, 255, .1);
+                    color: #fff;
+                }
+
+                .app-mobile-nav {
+                    border-bottom: 1px solid var(--app-border);
+                }
+
+                .app-content {
+                    margin: 0 auto;
+                    max-width: 1200px;
+                    padding: 28px 20px 48px;
+                    width: 100%;
+                }
+
+                .card {
+                    border: 1px solid var(--app-border);
+                    border-radius: 12px;
+                    box-shadow: 0 10px 30px rgba(15, 23, 42, .06);
+                }
+
+                .metric-card {
+                    min-height: 132px;
+                }
+
+                .text-positive {
+                    color: #15803d;
+                }
+
+                .text-negative {
+                    color: #dc2626;
+                }
+
+                .badge-buy {
+                    background: #dcfce7;
+                    color: #166534;
+                }
+
+                .badge-sell {
+                    background: #fee2e2;
+                    color: #991b1b;
+                }
+
+                .auth-card {
+                    max-width: 460px;
+                    width: 100%;
+                }
+
+                .page-kicker {
+                    color: var(--app-muted);
+                    font-size: .92rem;
+                }
+
+                .table-hover-pop tbody tr {
+                    transition: background-color .15s ease, box-shadow .15s ease, transform .15s ease;
+                }
+
+                .table-hover-pop tbody tr:hover {
+                    background: #ffffff;
+                    box-shadow: 0 8px 22px rgba(15, 23, 42, .12);
+                    position: relative;
+                    transform: translateY(-1px);
+                    z-index: 1;
+                }
+
+                @media (max-width: 991.98px) {
+                    .app-content {
+                        padding-top: 20px;
+                    }
+                }
+            </style>
+        {% endblock %}
+
+        {% block javascripts %}
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+        {% endblock %}
+    </head>
+    <body>
+        {% set navItems = [
+            { label: 'Dashboard', route: 'app_dashboard' },
+            { label: 'Portfolio', route: 'app_portfolio' },
+            { label: 'Transactions', route: 'app_transactions' },
+            { label: 'Upload', route: 'app_transaction_upload' },
+            { label: 'Broker Accounts', route: 'app_broker_accounts' },
+            { label: 'Watchlist', route: 'app_watchlist' },
+            { label: 'Settings', route: 'app_settings' }
+        ] %}
+
+        {% block body %}
+            {% if app.user %}
+                <nav class="navbar navbar-expand-lg bg-white app-mobile-nav d-lg-none">
+                    <div class="container-fluid">
+                        <a class="navbar-brand fw-semibold" href="{{ path('app_dashboard') }}">FinApp</a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mobileNav" aria-controls="mobileNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div class="collapse navbar-collapse" id="mobileNav">
+                            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                                {% for item in navItems %}
+                                    <li class="nav-item">
+                                        <a class="nav-link {{ app.current_route == item.route ? 'active fw-semibold' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                            <a class="btn btn-outline-secondary btn-sm" href="{{ path('app_logout') }}">Logout</a>
+                        </div>
+                    </div>
+                </nav>
+                <div class="app-shell d-lg-flex">
+                    <aside class="app-sidebar d-none d-lg-flex flex-column p-4">
+                        <a class="text-white text-decoration-none fs-4 fw-semibold mb-4" href="{{ path('app_dashboard') }}">FinApp</a>
+                        <nav class="nav nav-pills flex-column gap-1">
+                            {% for item in navItems %}
+                                <a class="nav-link {{ app.current_route == item.route ? 'active' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
+                            {% endfor %}
+                        </nav>
+                        <div class="mt-auto pt-4">
+                            <div class="small text-white-50 mb-2">{{ app.user.userIdentifier }}</div>
+                            <a class="btn btn-outline-light btn-sm w-100" href="{{ path('app_logout') }}">Logout</a>
+                        </div>
+                    </aside>
+                    <main class="flex-grow-1">
+                        <div class="app-content">
+                            {% include '_flash.html.twig' %}
+                            {% block main %}{% endblock %}
+                        </div>
+                    </main>
+                </div>
+            {% else %}
+                <main class="min-vh-100 d-flex align-items-center justify-content-center p-3">
+                    {% include '_flash.html.twig' %}
+                    {% block auth %}{% endblock %}
+                </main>
+            {% endif %}
+        {% endblock %}
+    </body>
+</html>

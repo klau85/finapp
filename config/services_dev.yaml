@@ -1,0 +1,6 @@
+services:
+    App\Logging\FileLogger:
+        arguments:
+            $path: '%kernel.logs_dir%/dev.log'
+
+    Psr\Log\LoggerInterface: '@App\Logging\FileLogger'

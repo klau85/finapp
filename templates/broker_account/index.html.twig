@@ -1,0 +1,92 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Broker Accounts | FinApp{% endblock %}
+
+{% block main %}
+    <div class="mb-4">
+        <div class="page-kicker">Accounts</div>
+        <h1 class="h2 mb-0">Broker Accounts</h1>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Create account</h2>
+                    {{ form_start(form) }}
+                        {{ form_row(form.brokerType) }}
+                        {{ form_row(form.displayName) }}
+                        {{ form_row(form.accountIdentifier) }}
+                        {{ form_row(form.currency) }}
+                        <button class="btn btn-dark w-100" type="submit">Save broker account</button>
+                    {{ form_end(form) }}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Your accounts</h2>
+                    {% if brokerAccounts %}
+                        <div class="table-responsive">
+                            <table class="table table-hover-pop align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Display name</th>
+                                        <th>Broker</th>
+                                        <th>Identifier</th>
+                                        <th>Currency</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for account in brokerAccounts %}
+                                        <tr>
+                                            <td class="fw-semibold">{{ account.displayName }}</td>
+                                            <td><span class="badge text-bg-light">{{ account.brokerTypeLabel }}</span></td>
+                                            <td>{{ account.accountIdentifier ?: '-' }}</td>
+                                            <td>{{ account.currency }}</td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteBrokerAccount{{ account.id }}">
+                                                    Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {% for account in brokerAccounts %}
+                            <div class="modal fade" id="deleteBrokerAccount{{ account.id }}" tabindex="-1" aria-labelledby="deleteBrokerAccount{{ account.id }}Label" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h2 class="modal-title fs-5" id="deleteBrokerAccount{{ account.id }}Label">Delete broker account</h2>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p class="mb-2">Delete <strong>{{ account.displayName }}</strong>?</p>
+                                            <p class="text-secondary mb-0">All transactions, import files, FIFO lots, and realized trades associated with this broker account will also be deleted.</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <form method="post" action="{{ path('app_broker_account_delete', { id: account.id }) }}">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete_broker_account_' ~ account.id) }}">
+                                                <button type="submit" class="btn btn-danger">Delete account</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="border rounded-3 p-4 text-secondary">
+                            Add accounts such as XTB Romania, XTB Long-Term Account, IBKR Main Account, or Revolut Stocks.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

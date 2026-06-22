@@ -1,0 +1,224 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Dashboard | FinApp{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">Overview</div>
+            <h1 class="h2 mb-0">Dashboard</h1>
+        </div>
+        <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload Transactions</a>
+    </div>
+
+    {% if not hasTransactions %}
+        <div class="card">
+            <div class="card-body p-5 text-center">
+                <h2 class="h4 mb-2">Start by uploading your broker transactions.</h2>
+                <p class="text-secondary mb-4">Once imported, your holdings, activity, and performance analytics will appear here.</p>
+                <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload Transactions</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <div class="text-secondary mb-2">Portfolio Value</div>
+                        <div class="h3 mb-0">{{ metrics.portfolioValue is not null ? metrics.portfolioValue|money_symbol('USD') : 'Unavailable' }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <div class="text-secondary mb-2">Today's P/L</div>
+                        {% if metrics.todayPl is not null %}
+                            <div class="h3 mb-0 {{ metrics.todayPl starts with '-' ? 'text-negative' : 'text-positive' }}">{{ metrics.todayPl|money_symbol('USD') }}</div>
+                        {% else %}
+                            <div class="h3 mb-0">Unavailable</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <div class="text-secondary mb-2">Total Return</div>
+                        {% if metrics.totalReturn is not null %}
+                            <div class="h3 mb-0 {{ metrics.totalReturn starts with '-' ? 'text-negative' : 'text-positive' }}">{{ metrics.totalReturn|money_symbol('USD') }}</div>
+                        {% else %}
+                            <div class="h3 mb-0">Unavailable</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card">
+                    <div class="card-body">
+                        <div class="text-secondary mb-2">Cash Invested</div>
+                        {% if metrics.cashInvested %}
+                            {% for currency, amount in metrics.cashInvested %}
+                                <div class="h5 mb-1">{{ amount|money_symbol(currency) }}</div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="h3 mb-0">$0</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not marketDataAvailable %}
+            <div class="alert alert-warning">Market data is unavailable at this moment.</div>
+        {% endif %}
+
+        <div class="row g-4 mb-4">
+            <div class="col-xl-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h5 mb-0">My Holdings</h2>
+                            <a class="small text-secondary" href="{{ path('app_portfolio') }}">Open portfolio</a>
+                        </div>
+                        {% if positions %}
+                            <div class="table-responsive">
+                                <table class="table table-hover-pop align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Symbol</th>
+                                            <th class="text-end">Shares</th>
+                                            <th class="text-end">Market Value</th>
+                                            <th class="text-end">Total P/L</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for position in positions|slice(0, 8) %}
+                                            <tr>
+                                                <td>
+                                                    <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: position.symbol }) }}">{{ position.symbol }}</a>
+                                                    <div class="small text-secondary">{{ position.companyName ?: '' }}</div>
+                                                </td>
+                                                <td class="text-end">{{ position.totalShares|trim_number }}</td>
+                                                <td class="text-end">{{ position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
+                                                <td class="text-end {{ position.marketDataAvailable and position.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                    {{ position.marketDataAvailable ? position.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No open holdings. Recent transactions are still listed below.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Recent Activity</h2>
+                        {% if recentActivities %}
+                            <div class="vstack gap-3">
+                                {% for activity in recentActivities %}
+                                    <div class="border-bottom pb-3">
+                                        <span class="badge {{ activity.type == 'BUY' ? 'badge-buy' : 'badge-sell' }} me-2">{{ activity.type }}</span>
+                                        <span>{{ activity.sentence }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No recent activity.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Biggest Winners</h2>
+                        {% include 'dashboard/_performance_list.html.twig' with { items: biggestWinners, marketDataAvailable: marketDataAvailable } %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Biggest Losers</h2>
+                        {% include 'dashboard/_performance_list.html.twig' with { items: biggestLosers, marketDataAvailable: marketDataAvailable } %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Broker Allocation</h2>
+                        {% if not marketDataAvailable %}
+                            <p class="text-secondary mb-0">Unavailable</p>
+                        {% elseif brokerAllocation %}
+                            <div class="table-responsive">
+                                <table class="table table-hover-pop align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Broker Account</th>
+                                            <th class="text-end">Market Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for allocation in brokerAllocation %}
+                                            <tr>
+                                                <td>{{ allocation.brokerAccount }}</td>
+                                                <td class="text-end">{{ allocation.marketValue|money_symbol('USD') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No broker allocation yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Currency Exposure</h2>
+                        {% if not marketDataAvailable %}
+                            <p class="text-secondary mb-0">Unavailable</p>
+                        {% elseif currencyExposure %}
+                            <div class="table-responsive">
+                                <table class="table table-hover-pop align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Currency</th>
+                                            <th class="text-end">Market Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for exposure in currencyExposure %}
+                                            <tr>
+                                                <td>{{ exposure.currency }}</td>
+                                                <td class="text-end">{{ exposure.marketValue|money_symbol(exposure.currency) }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-secondary mb-0">No currency exposure yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

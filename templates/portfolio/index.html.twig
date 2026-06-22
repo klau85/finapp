@@ -1,0 +1,170 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Portfolio | FinApp{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">Aggregated across broker accounts</div>
+            <h1 class="h2 mb-0">Portfolio</h1>
+        </div>
+        <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload transactions</a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Market Value</div>
+                    <div class="h3 mb-0">{{ totals.marketValue is not null ? totals.marketValue|money_symbol('USD') : 'Unavailable' }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Realized P/L</div>
+                    <div class="h3 mb-0 {{ totals.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                        ${{ totals.realizedGain|trim_number }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Unrealized P/L</div>
+                    {% if totals.unrealizedGain is not null %}
+                        <div class="h3 mb-0 {{ totals.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                            {{ totals.unrealizedGain|money_symbol('USD') }}
+                        </div>
+                    {% else %}
+                        <div class="h3 mb-0">Unavailable</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card metric-card">
+                <div class="card-body">
+                    <div class="text-secondary mb-2">Total P/L</div>
+                    {% if totals.totalGain is not null %}
+                        <div class="h3 mb-0 {{ totals.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                            {{ totals.totalGain|money_symbol('USD') }}
+                        </div>
+                    {% else %}
+                        <div class="h3 mb-0">Unavailable</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if not marketDataAvailable %}
+        <div class="alert alert-warning">Market data is unavailable at this moment.</div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            {% if positions %}
+                <div class="table-responsive">
+                    <table class="table table-hover-pop align-middle">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Company name</th>
+                                <th class="text-end">Total shares</th>
+                                <th class="text-end">Average cost</th>
+                                <th class="text-end">Current price</th>
+                                <th class="text-end">Market value</th>
+                                <th class="text-end">Realized P/L</th>
+                                <th class="text-end">Unrealized P/L</th>
+                                <th class="text-end">Total P/L</th>
+                                <th class="text-end">Total P/L %</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for position in positions %}
+                                {% set rowId = 'portfolio-breakdown-' ~ loop.index %}
+                                <tr>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-secondary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#{{ rowId }}" aria-expanded="false" aria-controls="{{ rowId }}">+</button>
+                                        <span class="fw-semibold">{{ position.symbol }}</span>
+                                    </td>
+                                    <td>{{ position.companyName ?: '-' }}</td>
+                                    <td class="text-end">{{ position.totalShares|trim_number }}</td>
+                                    <td class="text-end">${{ position.averageCost|trim_number }}</td>
+                                    <td class="text-end">{{ position.marketDataAvailable ? position.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
+                                    <td class="text-end">{{ position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
+                                    <td class="text-end {{ position.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                        ${{ position.realizedGain|trim_number }}
+                                    </td>
+                                    <td class="text-end {{ position.marketDataAvailable and position.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                        {{ position.marketDataAvailable ? position.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                                    </td>
+                                    <td class="text-end {{ position.marketDataAvailable and position.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                        {{ position.marketDataAvailable ? position.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                    </td>
+                                    <td class="text-end {{ position.marketDataAvailable and position.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                        {{ position.marketDataAvailable ? position.totalGainPercent|trim_number ~ '%' : 'Unavailable' }}
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-dark" href="{{ path('app_stock_show', { symbol: position.symbol }) }}">Stock page</a>
+                                    </td>
+                                </tr>
+                                <tr class="collapse" id="{{ rowId }}">
+                                    <td colspan="11" class="bg-light">
+                                        <div class="p-3">
+                                            <div class="fw-semibold mb-2">{{ position.symbol }} breakdown by broker account</div>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover-pop mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Broker account</th>
+                                                            <th class="text-end">Shares</th>
+                                                            <th class="text-end">Average cost</th>
+                                                            <th class="text-end">Current price</th>
+                                                            <th class="text-end">Market value</th>
+                                                            <th class="text-end">Realized P/L</th>
+                                                            <th class="text-end">Unrealized P/L</th>
+                                                            <th class="text-end">Total P/L</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for breakdown in position.breakdown %}
+                                                            <tr>
+                                                                <td>{{ breakdown.brokerAccount }}</td>
+                                                                <td class="text-end">{{ breakdown.shares|trim_number }}</td>
+                                                                <td class="text-end">${{ breakdown.averageCost|trim_number }}</td>
+                                                                <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
+                                                                <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
+                                                                <td class="text-end {{ breakdown.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                                    ${{ breakdown.realizedGain|trim_number }}
+                                                                </td>
+                                                                <td class="text-end {{ breakdown.marketDataAvailable and breakdown.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                                    {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                                                                </td>
+                                                                <td class="text-end {{ breakdown.marketDataAvailable and breakdown.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
+                                                                    {{ breakdown.marketDataAvailable ? breakdown.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="border rounded-3 p-4 text-secondary">
+                    No open positions yet. Upload transactions to build your portfolio.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
