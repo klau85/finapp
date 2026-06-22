@@ -42,6 +42,7 @@ class PortfolioController extends AbstractController
         return $this->render('portfolio/index.html.twig', [
             'positions' => $positions,
             'marketDataAvailable' => $marketDataAvailable,
+            'exposure' => $this->buildExposure($positions),
             'totals' => [
                 'marketValue' => $marketDataAvailable ? array_reduce(
                     $positions,
@@ -228,6 +229,50 @@ class PortfolioController extends AbstractController
         unset($position);
 
         return $positions;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $positions
+     * @return list<array{symbol: string, companyName: ?string, currency: string, marketValue: string, marketValueFloat: float, percent: float}>
+     */
+    private function buildExposure(array $positions): array
+    {
+        $rows = [];
+        $total = DecimalMath::zero();
+
+        foreach ($positions as $position) {
+            if (($position['marketDataAvailable'] ?? false) !== true) {
+                continue;
+            }
+
+            $marketValue = (string) ($position['marketValue'] ?? DecimalMath::zero());
+            if (DecimalMath::cmp($marketValue, DecimalMath::zero()) <= 0) {
+                continue;
+            }
+
+            $rows[] = [
+                'symbol' => (string) $position['symbol'],
+                'companyName' => $position['companyName'] !== null ? (string) $position['companyName'] : null,
+                'currency' => (string) $position['currency'],
+                'marketValue' => $marketValue,
+                'marketValueFloat' => (float) $marketValue,
+                'percent' => 0.0,
+            ];
+            $total = DecimalMath::add($total, $marketValue);
+        }
+
+        if (DecimalMath::cmp($total, DecimalMath::zero()) <= 0) {
+            return [];
+        }
+
+        foreach ($rows as &$row) {
+            $row['percent'] = round(((float) $row['marketValue'] / (float) $total) * 100, 2);
+        }
+        unset($row);
+
+        usort($rows, static fn (array $left, array $right): int => $right['marketValueFloat'] <=> $left['marketValueFloat']);
+
+        return $rows;
     }
 
     /**

@@ -2,6 +2,50 @@
 
 {% block title %}Portfolio | FinApp{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .portfolio-exposure-chart {
+            aspect-ratio: 1;
+            height: min(100vw - 80px, 320px);
+            max-height: 320px;
+            max-width: 320px;
+            position: relative;
+            width: 100%;
+        }
+
+        .portfolio-exposure-legend {
+            column-gap: 1.5rem;
+            display: grid;
+            grid-auto-flow: column;
+            grid-template-rows: repeat(5, auto);
+            justify-content: start;
+            row-gap: .75rem;
+        }
+
+        .portfolio-exposure-item {
+            align-items: center;
+            display: grid;
+            column-gap: .45rem;
+            grid-template-columns: 14px max-content max-content;
+            max-width: 100%;
+        }
+
+        .portfolio-exposure-swatch {
+            border-radius: 999px;
+            height: 14px;
+            width: 14px;
+        }
+
+        @media (max-width: 575.98px) {
+            .portfolio-exposure-legend {
+                grid-auto-flow: row;
+                grid-template-rows: none;
+            }
+        }
+    </style>
+{% endblock %}
+
 {% block main %}
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
@@ -63,6 +107,43 @@
     {% if not marketDataAvailable %}
         <div class="alert alert-warning">Market data is unavailable at this moment.</div>
     {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="mb-3">
+                <h2 class="h5 mb-1">Exposure</h2>
+                <div class="text-secondary">Based on current market value by stock.</div>
+            </div>
+            {% if exposure %}
+                <div class="row g-4 align-items-center">
+                    <div class="col-lg-5 d-flex justify-content-center">
+                        <canvas id="portfolio-exposure-chart" class="portfolio-exposure-chart" width="320" height="320" aria-label="Portfolio exposure by stock" role="img"></canvas>
+                    </div>
+                    <div class="col-lg-7">
+                        <div id="portfolio-exposure-legend" class="portfolio-exposure-legend">
+                            {% for item in exposure %}
+                                <div class="portfolio-exposure-item">
+                                    <span class="portfolio-exposure-swatch" data-exposure-swatch="{{ loop.index0 }}"></span>
+                                    <div class="min-w-0">
+                                        <div class="fw-semibold text-truncate">{{ item.symbol }}</div>
+                                        <div class="small text-secondary text-truncate">{{ item.companyName ?: 'Company name not available' }}</div>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold">{{ item.percent|trim_number }}%</div>
+                                        <div class="small text-secondary">{{ item.marketValue|money_symbol(item.currency) }}</div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="border rounded-3 p-4 text-secondary">
+                    Exposure is unavailable until current market values are available.
+                </div>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="card">
         <div class="card-body">
@@ -167,4 +248,79 @@
             {% endif %}
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('portfolio-exposure-chart');
+            const exposure = {{ exposure|json_encode|raw }};
+
+            if (!canvas || !window.Chart || exposure.length === 0) {
+                return;
+            }
+
+            const colors = [
+                '#2563eb', '#16a34a', '#dc2626', '#f59e0b', '#7c3aed',
+                '#0891b2', '#db2777', '#4f46e5', '#65a30d', '#ea580c',
+                '#0f766e', '#be123c'
+            ];
+            const total = exposure.reduce((carry, item) => carry + Number(item.marketValueFloat || 0), 0);
+            const currencyFormatter = new Intl.NumberFormat(undefined, {
+                style: 'currency',
+                currency: exposure[0]?.currency || 'USD',
+                maximumFractionDigits: 2
+            });
+
+            if (total <= 0) {
+                return;
+            }
+
+            new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: exposure.map((item) => item.symbol),
+                    datasets: [{
+                        data: exposure.map((item) => Number(item.marketValueFloat || 0)),
+                        backgroundColor: exposure.map((item, index) => colors[index % colors.length]),
+                        borderColor: '#ffffff',
+                        borderWidth: 3,
+                        hoverBorderColor: '#111827',
+                        hoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '58%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => {
+                                    const item = exposure[items[0].dataIndex];
+
+                                    return item.companyName ? `${item.symbol} - ${item.companyName}` : item.symbol;
+                                },
+                                label: (context) => {
+                                    const item = exposure[context.dataIndex];
+
+                                    return `${item.percent}% exposure: ${currencyFormatter.format(Number(item.marketValueFloat || 0))}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            document.querySelectorAll('[data-exposure-swatch]').forEach((swatch) => {
+                const index = Number(swatch.dataset.exposureSwatch || 0);
+                swatch.style.backgroundColor = colors[index % colors.length];
+            });
+        });
+    </script>
 {% endblock %}
