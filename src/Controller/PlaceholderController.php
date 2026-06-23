@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\User;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -23,9 +28,39 @@ class PlaceholderController extends AbstractController
     }
 
     #[Route('/settings', name: 'app_settings')]
-    public function settings(): Response
+    public function settings(Request $request, EntityManagerInterface $entityManager): Response
     {
-        return $this->page('Settings');
+        $user = $this->getUser();
+        \assert($user instanceof User);
+
+        $form = $this->createFormBuilder($user)
+            ->add('numberFormat', ChoiceType::class, [
+                'label' => 'Number format',
+                'choices' => [
+                    '1,234.56' => User::NUMBER_FORMAT_COMMA_DOT,
+                    '1.234,56' => User::NUMBER_FORMAT_DOT_COMMA,
+                ],
+                'expanded' => true,
+                'help' => 'Choose how numbers and money values are displayed across the app.',
+            ])
+            ->add('save', SubmitType::class, [
+                'label' => 'Save settings',
+                'attr' => ['class' => 'btn btn-dark'],
+            ])
+            ->getForm();
+
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $entityManager->flush();
+            $this->addFlash('success', 'Settings saved.');
+
+            return $this->redirectToRoute('app_settings');
+        }
+
+        return $this->render('settings/index.html.twig', [
+            'form' => $form,
+        ]);
     }
 
     private function page(string $title): Response

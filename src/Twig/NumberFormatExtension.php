@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Twig;
 
+use App\Entity\User;
+use Symfony\Bundle\SecurityBundle\Security;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 
 class NumberFormatExtension extends AbstractExtension
 {
+    public function __construct(private readonly ?Security $security = null)
+    {
+    }
+
     public function getFilters(): array
     {
         return [
@@ -18,6 +24,24 @@ class NumberFormatExtension extends AbstractExtension
     }
 
     public function trimNumber(mixed $value): string
+    {
+        return $this->formatNumber($value, minimumMoneyDecimals: false);
+    }
+
+    public function moneySymbol(mixed $value, ?string $currency): string
+    {
+        $symbol = match (strtoupper((string) $currency)) {
+            'EUR' => '€',
+            'GBP' => '£',
+            'JPY' => '¥',
+            'USD' => '$',
+            default => strtoupper((string) $currency).' ',
+        };
+
+        return $symbol.$this->formatNumber($value, minimumMoneyDecimals: true);
+    }
+
+    private function formatNumber(mixed $value, bool $minimumMoneyDecimals): string
     {
         if ($value === null || $value === '') {
             return '';
@@ -34,9 +58,9 @@ class NumberFormatExtension extends AbstractExtension
         $number = ltrim($number, '+-');
 
         if (stripos($number, 'e') !== false) {
-            $number = rtrim(rtrim(sprintf('%.4F', (float) ($negative ? '-'.$number : $number)), '0'), '.');
+            $formatted = rtrim(rtrim(sprintf('%.4F', (float) ($negative ? '-'.$number : $number)), '0'), '.');
 
-            return $number === '-0' ? '0' : $number;
+            return $this->localize($formatted === '-0' ? '0' : $formatted, $minimumMoneyDecimals);
         }
 
         $rounded = number_format((float) ($negative ? '-'.$number : $number), 4, '.', '');
@@ -46,22 +70,44 @@ class NumberFormatExtension extends AbstractExtension
         [$whole, $decimal] = array_pad(explode('.', $rounded, 2), 2, '');
         $whole = ltrim($whole, '0') ?: '0';
         $decimal = rtrim($decimal, '0');
+        if ($minimumMoneyDecimals && strlen($decimal) === 1) {
+            $decimal .= '0';
+        }
 
         $formatted = $decimal === '' ? $whole : $whole.'.'.$decimal;
+        $formatted = $negative && $formatted !== '0' ? '-'.$formatted : $formatted;
 
-        return $negative && $formatted !== '0' ? '-'.$formatted : $formatted;
+        return $this->localize($formatted, minimumMoneyDecimals: false);
     }
 
-    public function moneySymbol(mixed $value, ?string $currency): string
+    private function localize(string $value, bool $minimumMoneyDecimals): string
     {
-        $symbol = match (strtoupper((string) $currency)) {
-            'EUR' => '€',
-            'GBP' => '£',
-            'JPY' => '¥',
-            'USD' => '$',
-            default => strtoupper((string) $currency).' ',
-        };
+        if ($minimumMoneyDecimals && str_contains($value, '.')) {
+            [$whole, $decimal] = explode('.', $value, 2);
+            if (strlen($decimal) === 1) {
+                $value = $whole.'.'.$decimal.'0';
+            }
+        }
 
-        return $symbol.$this->trimNumber($value);
+        $negative = str_starts_with($value, '-');
+        $value = ltrim($value, '-');
+        [$whole, $decimal] = array_pad(explode('.', $value, 2), 2, '');
+        [$thousandsSeparator, $decimalSeparator] = $this->separators();
+
+        $whole = preg_replace('/\B(?=(\d{3})+(?!\d))/', $thousandsSeparator, $whole) ?? $whole;
+        $formatted = $decimal === '' ? $whole : $whole.$decimalSeparator.$decimal;
+
+        return $negative ? '-'.$formatted : $formatted;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function separators(): array
+    {
+        $user = $this->security?->getUser();
+        $format = $user instanceof User ? $user->getNumberFormat() : User::NUMBER_FORMAT_COMMA_DOT;
+
+        return $format === User::NUMBER_FORMAT_DOT_COMMA ? ['.', ','] : [',', '.'];
     }
 }

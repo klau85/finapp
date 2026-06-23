@@ -29,7 +29,7 @@ final class StockChartMarkerFactoryTest extends TestCase
         self::assertCount(2, $markers);
         self::assertSame('2026-06-15', $markers[0]['time']);
         self::assertSame('B2', $markers[0]['text']);
-        self::assertContains("BUY 100 @ $142.5 - XTB Account 1", $markers[0]['details']);
+        self::assertContains("BUY 100 @ $142.50 - XTB Account 1", $markers[0]['details']);
         self::assertContains("BUY 25 @ $143 - XTB Account 1", $markers[0]['details']);
         self::assertSame('aboveBar', $markers[1]['position']);
         self::assertSame('S', $markers[1]['text']);

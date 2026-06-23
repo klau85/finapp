@@ -12,6 +12,7 @@ use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
 use App\Service\PortfolioAnalyticsService;
+use App\Twig\NumberFormatExtension;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -31,6 +32,7 @@ class DashboardController extends AbstractController
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
+        NumberFormatExtension $formatter,
     ): Response {
         $user = $this->getUser();
         \assert($user instanceof User);
@@ -45,7 +47,7 @@ class DashboardController extends AbstractController
             $position['marketDataAvailable'] = $available;
         }
         unset($position);
-        $recentTransactions = $transactionRepository->findRecentForUser($user);
+        $recentTransactions = $transactionRepository->findRecentForUser($user, 5);
 
         $portfolioValue = $marketDataAvailable ? array_reduce(
             $positions,
@@ -72,9 +74,9 @@ class DashboardController extends AbstractController
             'hasTransactions' => $transactionCount > 0,
             'marketDataAvailable' => $marketDataAvailable,
             'positions' => $positions,
-            'recentActivities' => $this->buildRecentActivity($recentTransactions),
-            'biggestWinners' => $marketDataAvailable ? array_slice($this->sortByGain($positions, descending: true), 0, 5) : [],
-            'biggestLosers' => $marketDataAvailable ? array_slice($this->sortByGain($positions, descending: false), 0, 5) : [],
+            'recentActivities' => $this->buildRecentActivity($recentTransactions, $formatter),
+            'biggestWinners' => $marketDataAvailable ? array_slice($this->positivePositions($this->sortByGain($positions, descending: true)), 0, 5) : [],
+            'biggestLosers' => $marketDataAvailable ? array_slice($this->negativePositions($this->sortByGain($positions, descending: false)), 0, 5) : [],
             'brokerAllocation' => $brokerAllocation,
             'currencyExposure' => $currencyExposure,
             'metrics' => [
@@ -140,9 +142,8 @@ class DashboardController extends AbstractController
      * @param list<\App\Entity\Transaction> $transactions
      * @return list<array{sentence: string, date: string, type: string, currency: string}>
      */
-    private function buildRecentActivity(array $transactions): array
+    private function buildRecentActivity(array $transactions, NumberFormatExtension $formatter): array
     {
-        $formatter = new \App\Twig\NumberFormatExtension();
         $activities = [];
 
         foreach ($transactions as $transaction) {
@@ -185,6 +186,30 @@ class DashboardController extends AbstractController
         });
 
         return $positions;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $positions
+     * @return list<array<string, mixed>>
+     */
+    private function negativePositions(array $positions): array
+    {
+        return array_values(array_filter(
+            $positions,
+            static fn (array $position): bool => DecimalMath::cmp((string) $position['totalGain'], DecimalMath::zero()) < 0,
+        ));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $positions
+     * @return list<array<string, mixed>>
+     */
+    private function positivePositions(array $positions): array
+    {
+        return array_values(array_filter(
+            $positions,
+            static fn (array $position): bool => DecimalMath::cmp((string) $position['totalGain'], DecimalMath::zero()) > 0,
+        ));
     }
 
     /**

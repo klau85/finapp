@@ -69,7 +69,7 @@
                 <div class="card-body">
                     <div class="text-secondary mb-2">Realized P/L</div>
                     <div class="h3 mb-0 {{ totals.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                        ${{ totals.realizedGain|trim_number }}
+                        {{ totals.realizedGain|money_symbol('USD') }}
                     </div>
                 </div>
             </div>
@@ -175,11 +175,11 @@
                                     </td>
                                     <td>{{ position.companyName ?: '-' }}</td>
                                     <td class="text-end">{{ position.totalShares|trim_number }}</td>
-                                    <td class="text-end">${{ position.averageCost|trim_number }}</td>
+                                    <td class="text-end">{{ position.averageCost|money_symbol(position.currency) }}</td>
                                     <td class="text-end">{{ position.marketDataAvailable ? position.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
                                     <td class="text-end">{{ position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
                                     <td class="text-end {{ position.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                        ${{ position.realizedGain|trim_number }}
+                                        {{ position.realizedGain|money_symbol(position.currency) }}
                                     </td>
                                     <td class="text-end {{ position.marketDataAvailable and position.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
                                         {{ position.marketDataAvailable ? position.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
@@ -217,11 +217,11 @@
                                                             <tr>
                                                                 <td>{{ breakdown.brokerAccount }}</td>
                                                                 <td class="text-end">{{ breakdown.shares|trim_number }}</td>
-                                                                <td class="text-end">${{ breakdown.averageCost|trim_number }}</td>
+                                                                <td class="text-end">{{ breakdown.averageCost|money_symbol(position.currency) }}</td>
                                                                 <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
                                                                 <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
                                                                 <td class="text-end {{ breakdown.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                                                    ${{ breakdown.realizedGain|trim_number }}
+                                                                    {{ breakdown.realizedGain|money_symbol(position.currency) }}
                                                                 </td>
                                                                 <td class="text-end {{ breakdown.marketDataAvailable and breakdown.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
                                                                     {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
@@ -257,6 +257,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('portfolio-exposure-chart');
             const exposure = {{ exposure|json_encode|raw }};
+            const numberFormat = '{{ app.user.numberFormat|default('comma_dot') }}';
 
             if (!canvas || !window.Chart || exposure.length === 0) {
                 return;
@@ -268,11 +269,23 @@
                 '#0f766e', '#be123c'
             ];
             const total = exposure.reduce((carry, item) => carry + Number(item.marketValueFloat || 0), 0);
-            const currencyFormatter = new Intl.NumberFormat(undefined, {
-                style: 'currency',
-                currency: exposure[0]?.currency || 'USD',
-                maximumFractionDigits: 2
-            });
+            const moneySymbol = (currency) => ({
+                EUR: '€',
+                GBP: '£',
+                JPY: '¥',
+                USD: '$'
+            }[String(currency || '').toUpperCase()] || `${String(currency || '').toUpperCase()} `);
+            const formatNumber = (value) => {
+                const rounded = Number(value || 0).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+                const [whole, decimal = ''] = rounded.split('.');
+                const thousands = numberFormat === 'dot_comma' ? '.' : ',';
+                const decimalSeparator = numberFormat === 'dot_comma' ? ',' : '.';
+                const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, thousands);
+                const paddedDecimal = decimal.length === 1 ? `${decimal}0` : decimal;
+
+                return paddedDecimal === '' ? grouped : `${grouped}${decimalSeparator}${paddedDecimal}`;
+            };
+            const formatMoney = (value, currency) => `${moneySymbol(currency)}${formatNumber(value)}`;
 
             if (total <= 0) {
                 return;
@@ -309,7 +322,7 @@
                                 label: (context) => {
                                     const item = exposure[context.dataIndex];
 
-                                    return `${item.percent}% exposure: ${currencyFormatter.format(Number(item.marketValueFloat || 0))}`;
+                                    return `${item.percent}% exposure: ${formatMoney(item.marketValueFloat, item.currency)}`;
                                 }
                             }
                         }

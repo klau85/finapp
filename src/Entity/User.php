@@ -18,6 +18,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[UniqueEntity(fields: ['username'], message: 'This username is already taken.')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    public const NUMBER_FORMAT_COMMA_DOT = 'comma_dot';
+    public const NUMBER_FORMAT_DOT_COMMA = 'dot_comma';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -36,6 +39,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private string $password = '';
+
+    #[ORM\Column(length: 20)]
+    private string $numberFormat = self::NUMBER_FORMAT_COMMA_DOT;
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
@@ -100,6 +106,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): self
     {
         $this->password = $password;
+
+        return $this;
+    }
+
+    public function getNumberFormat(): string
+    {
+        return $this->numberFormat;
+    }
+
+    public function setNumberFormat(string $numberFormat): self
+    {
+        if (!in_array($numberFormat, [self::NUMBER_FORMAT_COMMA_DOT, self::NUMBER_FORMAT_DOT_COMMA], true)) {
+            $numberFormat = self::NUMBER_FORMAT_COMMA_DOT;
+        }
+
+        $this->numberFormat = $numberFormat;
 
         return $this;
     }

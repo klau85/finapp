@@ -1,0 +1,25 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Settings | FinApp{% endblock %}
+
+{% block main %}
+    <div class="mb-4">
+        <div class="page-kicker">Preferences</div>
+        <h1 class="h2 mb-0">Settings</h1>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Display</h2>
+            {{ form_start(form) }}
+                {{ form_row(form.numberFormat) }}
+                <div class="border rounded-3 p-3 mb-3 bg-light">
+                    <div class="small text-secondary mb-2">Preview</div>
+                    <div>Shares: {{ '1234.5678'|trim_number }}</div>
+                    <div>Money: {{ '1234.5'|money_symbol('USD') }}</div>
+                </div>
+                {{ form_row(form.save) }}
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}

@@ -74,49 +74,34 @@
         {% endif %}
 
         <div class="row g-4 mb-4">
-            <div class="col-xl-8">
+            <div class="col-lg-6">
                 <div class="card h-100">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h2 class="h5 mb-0">My Holdings</h2>
-                            <a class="small text-secondary" href="{{ path('app_portfolio') }}">Open portfolio</a>
-                        </div>
-                        {% if positions %}
-                            <div class="table-responsive">
-                                <table class="table table-hover-pop align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Symbol</th>
-                                            <th class="text-end">Shares</th>
-                                            <th class="text-end">Market Value</th>
-                                            <th class="text-end">Total P/L</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for position in positions|slice(0, 8) %}
-                                            <tr>
-                                                <td>
-                                                    <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: position.symbol }) }}">{{ position.symbol }}</a>
-                                                    <div class="small text-secondary">{{ position.companyName ?: '' }}</div>
-                                                </td>
-                                                <td class="text-end">{{ position.totalShares|trim_number }}</td>
-                                                <td class="text-end">{{ position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
-                                                <td class="text-end {{ position.marketDataAvailable and position.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                                    {{ position.marketDataAvailable ? position.totalGain|money_symbol(position.currency) : 'Unavailable' }}
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <p class="text-secondary mb-0">No open holdings. Recent transactions are still listed below.</p>
-                        {% endif %}
+                        <h2 class="h5 mb-3">Biggest Winners</h2>
+                        {% include 'dashboard/_performance_list.html.twig' with {
+                            items: biggestWinners,
+                            marketDataAvailable: marketDataAvailable,
+                            emptyMessage: 'No stocks currently have a positive P/L.'
+                        } %}
                     </div>
                 </div>
             </div>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5 mb-3">Biggest Losers</h2>
+                        {% include 'dashboard/_performance_list.html.twig' with {
+                            items: biggestLosers,
+                            marketDataAvailable: marketDataAvailable,
+                            emptyMessage: 'No stocks currently have a negative P/L.'
+                        } %}
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <div class="col-xl-4">
+        <div class="row g-4 mb-4">
+            <div class="col-12">
                 <div class="card h-100">
                     <div class="card-body">
                         <h2 class="h5 mb-3">Recent Activity</h2>
@@ -132,25 +117,6 @@
                         {% else %}
                             <p class="text-secondary mb-0">No recent activity.</p>
                         {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-4 mb-4">
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h2 class="h5 mb-3">Biggest Winners</h2>
-                        {% include 'dashboard/_performance_list.html.twig' with { items: biggestWinners, marketDataAvailable: marketDataAvailable } %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h2 class="h5 mb-3">Biggest Losers</h2>
-                        {% include 'dashboard/_performance_list.html.twig' with { items: biggestLosers, marketDataAvailable: marketDataAvailable } %}
                     </div>
                 </div>
             </div>
