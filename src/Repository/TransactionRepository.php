@@ -216,25 +216,4 @@ class TransactionRepository extends ServiceEntityRepository
         return $queryBuilder;
     }
 
-    /**
-     * @return array<string, string>
-     */
-    public function getCashInvestedByCurrencyForUser(User $user): array
-    {
-        $rows = $this->createQueryBuilder('transaction')
-            ->select('transaction.currency AS currency')
-            ->addSelect("SUM(CASE WHEN transaction.type = 'BUY' THEN (transaction.quantity * transaction.price + transaction.fees) ELSE 0 END) AS invested")
-            ->andWhere('transaction.user = :user')
-            ->setParameter('user', $user)
-            ->groupBy('transaction.currency')
-            ->getQuery()
-            ->getArrayResult();
-
-        $indexed = [];
-        foreach ($rows as $row) {
-            $indexed[(string) $row['currency']] = (string) $row['invested'];
-        }
-
-        return $indexed;
-    }
 }

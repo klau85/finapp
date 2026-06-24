@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Exception\MarketDataUnavailableException;
 use App\MarketData\MarketDataManager;
 use App\Repository\BrokerAccountRepository;
+use App\Repository\PositionLotRepository;
 use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
@@ -32,6 +33,7 @@ class DashboardController extends AbstractController
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
+        PositionLotRepository $positionLotRepository,
         NumberFormatExtension $formatter,
     ): Response {
         $user = $this->getUser();
@@ -54,20 +56,15 @@ class DashboardController extends AbstractController
             static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['marketValue']),
             DecimalMath::zero()
         ) : null;
-        $totalReturn = $marketDataAvailable ? array_reduce(
+        $unrealizedPl = $marketDataAvailable ? array_reduce(
             $positions,
-            static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['totalGain']),
-            DecimalMath::zero()
-        ) : null;
-        $todayPl = $marketDataAvailable ? array_reduce(
-            $positions,
-            static fn (string $carry, array $position): string => DecimalMath::add($carry, DecimalMath::mul($position['marketValue'], '0.0025')),
+            static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['unrealizedGain']),
             DecimalMath::zero()
         ) : null;
 
         $brokerAllocation = $marketDataAvailable ? $this->buildBrokerAllocation($positions) : [];
         $currencyExposure = $marketDataAvailable ? $this->buildCurrencyExposure($positions) : [];
-        $cashInvested = $transactionRepository->getCashInvestedByCurrencyForUser($user);
+        $investedCapital = $positionLotRepository->getInvestedCapitalByCurrencyForUser($user);
 
         return $this->render('dashboard/index.html.twig', [
             'brokerAccounts' => $brokerAccounts->findForUser($user),
@@ -81,9 +78,8 @@ class DashboardController extends AbstractController
             'currencyExposure' => $currencyExposure,
             'metrics' => [
                 'portfolioValue' => $portfolioValue,
-                'todayPl' => $todayPl,
-                'totalReturn' => $totalReturn,
-                'cashInvested' => $cashInvested,
+                'unrealizedPl' => $unrealizedPl,
+                'investedCapital' => $investedCapital,
             ],
         ]);
     }

@@ -46,4 +46,28 @@ class PositionLotRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getInvestedCapitalByCurrencyForUser(User $user): array
+    {
+        $rows = $this->createQueryBuilder('positionLot')
+            ->select('stock.currency AS currency')
+            ->addSelect('SUM(positionLot.quantityRemaining * positionLot.price) AS investedCapital')
+            ->join('positionLot.stock', 'stock')
+            ->andWhere('positionLot.user = :user')
+            ->andWhere('positionLot.quantityRemaining > 0')
+            ->setParameter('user', $user)
+            ->groupBy('stock.currency')
+            ->getQuery()
+            ->getArrayResult();
+
+        $indexed = [];
+        foreach ($rows as $row) {
+            $indexed[(string) $row['currency']] = (string) $row['investedCapital'];
+        }
+
+        return $indexed;
+    }
 }

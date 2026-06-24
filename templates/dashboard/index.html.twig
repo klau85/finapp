@@ -21,7 +21,7 @@
         </div>
     {% else %}
         <div class="row g-3 mb-4">
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card metric-card">
                     <div class="card-body">
                         <div class="text-secondary mb-2">Portfolio Value</div>
@@ -29,36 +29,24 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card metric-card">
                     <div class="card-body">
-                        <div class="text-secondary mb-2">Today's P/L</div>
-                        {% if metrics.todayPl is not null %}
-                            <div class="h3 mb-0 {{ metrics.todayPl starts with '-' ? 'text-negative' : 'text-positive' }}">{{ metrics.todayPl|money_symbol('USD') }}</div>
+                        <div class="text-secondary mb-2">Unrealized P/L</div>
+                        {% if metrics.unrealizedPl is not null %}
+                            <div class="h3 mb-0 {{ metrics.unrealizedPl starts with '-' ? 'text-negative' : 'text-positive' }}">{{ metrics.unrealizedPl|money_symbol('USD') }}</div>
                         {% else %}
                             <div class="h3 mb-0">Unavailable</div>
                         {% endif %}
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <div class="card metric-card">
                     <div class="card-body">
-                        <div class="text-secondary mb-2">Total Return</div>
-                        {% if metrics.totalReturn is not null %}
-                            <div class="h3 mb-0 {{ metrics.totalReturn starts with '-' ? 'text-negative' : 'text-positive' }}">{{ metrics.totalReturn|money_symbol('USD') }}</div>
-                        {% else %}
-                            <div class="h3 mb-0">Unavailable</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card metric-card">
-                    <div class="card-body">
-                        <div class="text-secondary mb-2">Cash Invested</div>
-                        {% if metrics.cashInvested %}
-                            {% for currency, amount in metrics.cashInvested %}
+                        <div class="text-secondary mb-2">Invested Capital</div>
+                        {% if metrics.investedCapital %}
+                            {% for currency, amount in metrics.investedCapital %}
                                 <div class="h5 mb-1">{{ amount|money_symbol(currency) }}</div>
                             {% endfor %}
                         {% else %}
