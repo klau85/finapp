@@ -119,6 +119,37 @@ final class MarketDataManagerTest extends TestCase
         self::assertSame('147.50000000', $candles[0]->close);
     }
 
+    public function testLatestRequiredOhlcDateUsesPreviousWorkingDayBeforeMarketOpen(): void
+    {
+        self::assertSame('2026-06-23', $this->latestRequiredOhlcDate(
+            new \DateTimeImmutable('2026-06-24 12:00:00', new \DateTimeZone('UTC')),
+        )->format('Y-m-d'));
+    }
+
+    public function testLatestRequiredOhlcDateUsesCurrentWorkingDayAfterMarketOpen(): void
+    {
+        self::assertSame('2026-06-24', $this->latestRequiredOhlcDate(
+            new \DateTimeImmutable('2026-06-24 14:00:00', new \DateTimeZone('UTC')),
+        )->format('Y-m-d'));
+    }
+
+    public function testLatestRequiredOhlcDateUsesFridayOnWeekend(): void
+    {
+        self::assertSame('2026-06-26', $this->latestRequiredOhlcDate(
+            new \DateTimeImmutable('2026-06-27 14:00:00', new \DateTimeZone('UTC')),
+        )->format('Y-m-d'));
+        self::assertSame('2026-06-26', $this->latestRequiredOhlcDate(
+            new \DateTimeImmutable('2026-06-28 14:00:00', new \DateTimeZone('UTC')),
+        )->format('Y-m-d'));
+    }
+
+    public function testLatestRequiredOhlcDateUsesFridayOnMondayBeforeMarketOpen(): void
+    {
+        self::assertSame('2026-06-26', $this->latestRequiredOhlcDate(
+            new \DateTimeImmutable('2026-06-29 12:00:00', new \DateTimeZone('UTC')),
+        )->format('Y-m-d'));
+    }
+
     public function testOhlcCacheMissFetchesAndStoresCandles(): void
     {
         $stock = $this->stock();
@@ -261,6 +292,13 @@ final class MarketDataManagerTest extends TestCase
     private function quoteTtlMinutes(\DateTimeImmutable $now): int
     {
         $method = new \ReflectionMethod(MarketDataManager::class, 'currentQuoteTtlMinutes');
+
+        return $method->invoke($this->manager(), $now);
+    }
+
+    private function latestRequiredOhlcDate(\DateTimeImmutable $now): \DateTimeImmutable
+    {
+        $method = new \ReflectionMethod(MarketDataManager::class, 'latestRequiredOhlcDate');
 
         return $method->invoke($this->manager(), $now);
     }

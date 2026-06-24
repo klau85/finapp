@@ -97,10 +97,10 @@ final readonly class MarketDataManager
     private function getDailyOhlc(Stock $stock, \DateTimeInterface $from, \DateTimeInterface $to): array
     {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $today = $now->setTime(0, 0);
+        $latestRequiredMarketDay = $this->latestRequiredOhlcDate($now);
         $latest = $this->stockPriceRepository->findLatestForStock($stock);
 
-        if ($latest !== null && $latest->getDate() >= $today) {
+        if ($latest !== null && $latest->getDate() >= $latestRequiredMarketDay) {
             $cached = $this->stockPriceRepository->findForStockBetween($stock, $from, $to);
 
             return array_map($this->ohlcFromEntity(...), $cached);
@@ -110,7 +110,7 @@ final readonly class MarketDataManager
         $providerException = null;
         foreach ($this->ohlcProviders($stock) as $provider) {
             try {
-                $candles = $provider->getDailyOhlc($stock, $fetchFrom, $today);
+                $candles = $provider->getDailyOhlc($stock, $fetchFrom, $latestRequiredMarketDay);
                 $this->storeCandles($stock, $candles, $now);
 
                 return array_map(
@@ -206,6 +206,32 @@ final readonly class MarketDataManager
         $minutes = ((int) $marketTime->format('H')) * 60 + (int) $marketTime->format('i');
 
         return $minutes >= (9 * 60 + 30) && $minutes < (16 * 60);
+    }
+
+    private function latestRequiredOhlcDate(\DateTimeImmutable $now): \DateTimeImmutable
+    {
+        $marketTime = $now->setTimezone(new \DateTimeZone('America/New_York'));
+        $dayOfWeek = (int) $marketTime->format('N');
+        $minutes = ((int) $marketTime->format('H')) * 60 + (int) $marketTime->format('i');
+
+        if ($dayOfWeek === 6) {
+            $marketTime = $marketTime->modify('-1 day');
+        } elseif ($dayOfWeek === 7) {
+            $marketTime = $marketTime->modify('-2 days');
+        } elseif ($minutes < (9 * 60 + 30)) {
+            $marketTime = $this->previousMarketWorkingDay($marketTime);
+        }
+
+        return $marketTime->setTimezone(new \DateTimeZone('UTC'))->setTime(0, 0);
+    }
+
+    private function previousMarketWorkingDay(\DateTimeImmutable $marketTime): \DateTimeImmutable
+    {
+        do {
+            $marketTime = $marketTime->modify('-1 day');
+        } while ((int) $marketTime->format('N') >= 6);
+
+        return $marketTime;
     }
 
     /**
