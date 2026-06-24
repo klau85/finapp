@@ -20,8 +20,11 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class PortfolioController extends AbstractController
 {
+    private const POSITIONS_PER_PAGE = 20;
+
     #[Route('/portfolio', name: 'app_portfolio')]
     public function index(
+        Request $request,
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
@@ -38,14 +41,31 @@ class PortfolioController extends AbstractController
         $positions = $portfolioAnalytics->getAggregatedPortfolio($user, $currentPrices);
         $positions = $this->markMarketAvailability($positions, $unavailableSymbols);
         $marketDataAvailable = $unavailableSymbols === [];
+        $positionsWithMarketData = array_values(array_filter(
+            $positions,
+            static fn (array $position): bool => ($position['marketDataAvailable'] ?? false) === true,
+        ));
+        $hasPricedPositions = $positionsWithMarketData !== [];
+        $totalPositions = count($positions);
+        $totalPages = max(1, (int) ceil($totalPositions / self::POSITIONS_PER_PAGE));
+        $currentPage = max(1, $request->query->getInt('page', 1));
+        $currentPage = min($currentPage, $totalPages);
+        $paginatedPositions = array_slice(
+            $positions,
+            ($currentPage - 1) * self::POSITIONS_PER_PAGE,
+            self::POSITIONS_PER_PAGE,
+        );
+        $queryParams = $request->query->all();
+        unset($queryParams['page']);
 
         return $this->render('portfolio/index.html.twig', [
-            'positions' => $positions,
+            'positions' => $paginatedPositions,
             'marketDataAvailable' => $marketDataAvailable,
+            'partialMarketData' => !$marketDataAvailable && $hasPricedPositions,
             'exposure' => $this->buildExposure($positions),
             'totals' => [
-                'marketValue' => $marketDataAvailable ? array_reduce(
-                    $positions,
+                'marketValue' => $hasPricedPositions ? array_reduce(
+                    $positionsWithMarketData,
                     static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['marketValue']),
                     DecimalMath::zero()
                 ) : null,
@@ -54,16 +74,25 @@ class PortfolioController extends AbstractController
                     static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['realizedGain']),
                     DecimalMath::zero()
                 ),
-                'unrealizedGain' => $marketDataAvailable ? array_reduce(
-                    $positions,
+                'unrealizedGain' => $hasPricedPositions ? array_reduce(
+                    $positionsWithMarketData,
                     static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['unrealizedGain']),
                     DecimalMath::zero()
                 ) : null,
-                'totalGain' => $marketDataAvailable ? array_reduce(
-                    $positions,
+                'totalGain' => $hasPricedPositions ? array_reduce(
+                    $positionsWithMarketData,
                     static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['totalGain']),
                     DecimalMath::zero()
                 ) : null,
+            ],
+            'pagination' => [
+                'currentPage' => $currentPage,
+                'totalPages' => $totalPages,
+                'perPage' => self::POSITIONS_PER_PAGE,
+                'totalItems' => $totalPositions,
+                'queryParams' => $queryParams,
+                'firstItem' => $totalPositions === 0 ? 0 : (($currentPage - 1) * self::POSITIONS_PER_PAGE) + 1,
+                'lastItem' => min($currentPage * self::POSITIONS_PER_PAGE, $totalPositions),
             ],
         ]);
     }
