@@ -18,9 +18,9 @@ final class CsvTransactionParserTest extends TestCase
             ->setCurrency('USD');
 
         $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
-Type,Ticker,Time,Comment,Ignored
-Stock purchase,NVDA.US,2026-02-12 9:15:00,OPEN BUY 1/1.18 @ 43.37,abc
-Stock sell,MSFT.US,2026-03-13 14:30:00,CLOSE BUY 0.14/0.34 @ 645.64,xyz
+Type,Ticker,Time,Comment,Amount,Ignored
+Stock purchase,NVDA.US,2026-02-12 9:15:00,OPEN BUY 1/1.18 @ 43.37,-43.37,abc
+Stock sell,MSFT.US,2026-03-13 14:30:00,CLOSE BUY 0.14/0.34 @ 645.64,90.39,xyz
 CSV), $account);
 
         self::assertCount(2, $rows);
@@ -34,6 +34,8 @@ CSV), $account);
             'price' => '43.37000000',
             'currency' => 'USD',
             'fees' => '0.00000000',
+            'brokerAmount' => '43.37000000',
+            'brokerCurrency' => 'USD',
         ], $rows[0]->data);
 
         self::assertTrue($rows[1]->isValid());
@@ -41,6 +43,7 @@ CSV), $account);
         self::assertSame('SELL', $rows[1]->data['type']);
         self::assertSame('0.14000000', $rows[1]->data['quantity']);
         self::assertSame('645.64000000', $rows[1]->data['price']);
+        self::assertSame('90.39000000', $rows[1]->data['brokerAmount']);
     }
 
     public function testXtbCsvRejectsUnsupportedTransactionTypes(): void
@@ -50,13 +53,15 @@ CSV), $account);
             ->setCurrency('EUR');
 
         $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
-Type;Ticker;Time;Comment
-Dividend;NVDA.US;2026-02-12 09:15:00;OPEN BUY 1 @ 43.37
+Type;Ticker;Time;Comment;Amount
+Dividend;NVDA.US;2026-02-12 09:15:00;OPEN BUY 1 @ 43.37;-39,91
 CSV), $account);
 
         self::assertCount(1, $rows);
         self::assertFalse($rows[0]->isValid());
-        self::assertSame('EUR', $rows[0]->data['currency']);
+        self::assertSame('USD', $rows[0]->data['currency']);
+        self::assertSame('EUR', $rows[0]->data['brokerCurrency']);
+        self::assertSame('39.91000000', $rows[0]->data['brokerAmount']);
         self::assertContains('type must be Stock purchase or Stock sell.', $rows[0]->errors);
     }
 
@@ -67,8 +72,8 @@ CSV), $account);
             ->setCurrency('USD');
 
         $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
-Type,Ticker,Time,Comment
-Stock purchase,VOW.DE,2026-02-12 09:15:00,OPEN BUY 1 @ 43.37
+Type,Ticker,Time,Comment,Amount
+Stock purchase,VOW.DE,2026-02-12 09:15:00,OPEN BUY 1 @ 43.37,-43.37
 CSV), $account);
 
         self::assertCount(1, $rows);

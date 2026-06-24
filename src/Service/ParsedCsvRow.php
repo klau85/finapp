@@ -15,7 +15,9 @@ final readonly class ParsedCsvRow
      *     price?: string,
      *     currency?: string,
      *     fees?: string,
-     *     transactionDate?: string
+     *     transactionDate?: string,
+     *     brokerAmount?: string,
+     *     brokerCurrency?: string
      * } $data
      * @param list<string> $errors
      */

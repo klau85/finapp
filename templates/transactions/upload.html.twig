@@ -101,6 +101,7 @@
                                     <th>Ticker</th>
                                     <th>Time</th>
                                     <th>Comment</th>
+                                    <th>Amount</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -109,17 +110,19 @@
                                     <td>NVDA.US</td>
                                     <td>2026-02-12 9:15:00</td>
                                     <td>OPEN BUY 1/1.18 @ 43.37</td>
+                                    <td>-43.37</td>
                                 </tr>
                                 <tr>
                                     <td>Stock sell</td>
                                     <td>MSFT.US</td>
                                     <td>2026-03-13 14:30:00</td>
                                     <td>CLOSE BUY 0.14/0.34 @ 645.64</td>
+                                    <td>90.39</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-secondary mb-0">XTB imports use the selected broker account currency and set fees to 0. Rows with non-US tickers are marked invalid and skipped.</p>
+                    <p class="text-secondary mb-0">XTB imports save the Comment price as USD price/currency. The absolute Amount value is saved separately in the selected broker account currency. Fees are set to 0. Rows with non-US tickers are marked invalid and skipped.</p>
                 </div>
             </div>
         </div>

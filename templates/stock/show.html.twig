@@ -208,6 +208,7 @@
                             <th class="text-end">Price</th>
                             <th class="text-end">Fees</th>
                             <th>Currency</th>
+                            <th class="text-end">Broker amount</th>
                             <th class="text-end">Total amount</th>
                         </tr>
                     </thead>
@@ -227,6 +228,13 @@
                                 <td class="text-end">{{ transaction.price|money_symbol(transaction.currency) }}</td>
                                 <td class="text-end">{{ transaction.fees|money_symbol(transaction.currency) }}</td>
                                 <td>{{ transaction.currency }}</td>
+                                <td class="text-end">
+                                    {% if transaction.brokerAmount is not null and transaction.brokerCurrency is not null %}
+                                        {{ transaction.brokerAmount|money_symbol(transaction.brokerCurrency) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td class="text-end">{{ transaction.totalAmount|money_symbol(transaction.currency) }}</td>
                             </tr>
                         {% endfor %}

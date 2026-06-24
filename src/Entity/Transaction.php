@@ -58,6 +58,12 @@ class Transaction
     #[ORM\Column(length: 3)]
     private string $currency = 'USD';
 
+    #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8, nullable: true)]
+    private ?string $brokerAmount = null;
+
+    #[ORM\Column(length: 3, nullable: true)]
+    private ?string $brokerCurrency = null;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $notes = null;
 
@@ -187,6 +193,30 @@ class Transaction
     public function setCurrency(string $currency): self
     {
         $this->currency = strtoupper($currency);
+
+        return $this;
+    }
+
+    public function getBrokerAmount(): ?string
+    {
+        return $this->brokerAmount;
+    }
+
+    public function setBrokerAmount(?string $brokerAmount): self
+    {
+        $this->brokerAmount = $brokerAmount;
+
+        return $this;
+    }
+
+    public function getBrokerCurrency(): ?string
+    {
+        return $this->brokerCurrency;
+    }
+
+    public function setBrokerCurrency(?string $brokerCurrency): self
+    {
+        $this->brokerCurrency = $brokerCurrency !== null ? strtoupper($brokerCurrency) : null;
 
         return $this;
     }

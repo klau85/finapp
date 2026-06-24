@@ -60,6 +60,7 @@
                             <th class="text-end">Price</th>
                             <th>Currency</th>
                             <th class="text-end">Fees</th>
+                            <th class="text-end">Broker amount</th>
                             <th>Validation</th>
                         </tr>
                     </thead>
@@ -83,6 +84,13 @@
                                 <td class="text-end">{{ data.price is defined ? data.price|trim_number : '-' }}</td>
                                 <td>{{ data.currency ?? '-' }}</td>
                                 <td class="text-end">{{ data.fees is defined ? data.fees|trim_number : '-' }}</td>
+                                <td class="text-end">
+                                    {% if data.brokerAmount is defined and data.brokerCurrency is defined %}
+                                        {{ data.brokerAmount|money_symbol(data.brokerCurrency) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if row.valid %}
                                         <span class="text-positive">Valid</span>

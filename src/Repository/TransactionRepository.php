@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\Transaction;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /** @extends ServiceEntityRepository<Transaction> */
@@ -55,48 +56,33 @@ class TransactionRepository extends ServiceEntityRepository
      * } $filters
      * @return list<Transaction>
      */
-    public function findFilteredForUser(User $user, array $filters): array
+    public function findFilteredForUser(User $user, array $filters, int $limit = 50, int $offset = 0): array
     {
-        $queryBuilder = $this->createQueryBuilder('transaction')
+        return $this->createFilteredQueryBuilder($user, $filters)
             ->addSelect('brokerAccount', 'stock')
-            ->join('transaction.brokerAccount', 'brokerAccount')
-            ->join('transaction.stock', 'stock')
-            ->andWhere('transaction.user = :user')
-            ->setParameter('user', $user)
             ->orderBy('transaction.transactionDate', 'DESC')
-            ->addOrderBy('transaction.id', 'DESC');
+            ->addOrderBy('transaction.id', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 
-        if (($filters['symbol'] ?? null) !== null && $filters['symbol'] !== '') {
-            $queryBuilder
-                ->andWhere('stock.symbol LIKE :symbol')
-                ->setParameter('symbol', strtoupper($filters['symbol']).'%');
-        }
-
-        if (($filters['brokerAccountId'] ?? null) !== null) {
-            $queryBuilder
-                ->andWhere('brokerAccount.id = :brokerAccountId')
-                ->setParameter('brokerAccountId', $filters['brokerAccountId']);
-        }
-
-        if (($filters['type'] ?? null) !== null && $filters['type'] !== '') {
-            $queryBuilder
-                ->andWhere('transaction.type = :type')
-                ->setParameter('type', strtoupper($filters['type']));
-        }
-
-        if (($filters['dateFrom'] ?? null) instanceof \DateTimeImmutable) {
-            $queryBuilder
-                ->andWhere('transaction.transactionDate >= :dateFrom')
-                ->setParameter('dateFrom', $filters['dateFrom']);
-        }
-
-        if (($filters['dateTo'] ?? null) instanceof \DateTimeImmutable) {
-            $queryBuilder
-                ->andWhere('transaction.transactionDate <= :dateTo')
-                ->setParameter('dateTo', $filters['dateTo']);
-        }
-
-        return $queryBuilder->getQuery()->getResult();
+    /**
+     * @param array{
+     *     symbol?: string|null,
+     *     brokerAccountId?: int|null,
+     *     type?: string|null,
+     *     dateFrom?: \DateTimeImmutable|null,
+     *     dateTo?: \DateTimeImmutable|null
+     * } $filters
+     */
+    public function countFilteredForUser(User $user, array $filters): int
+    {
+        return (int) $this->createFilteredQueryBuilder($user, $filters)
+            ->select('COUNT(transaction.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**
@@ -178,6 +164,56 @@ class TransactionRepository extends ServiceEntityRepository
             ->setParameter('user', $user)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    /**
+     * @param array{
+     *     symbol?: string|null,
+     *     brokerAccountId?: int|null,
+     *     type?: string|null,
+     *     dateFrom?: \DateTimeImmutable|null,
+     *     dateTo?: \DateTimeImmutable|null
+     * } $filters
+     */
+    private function createFilteredQueryBuilder(User $user, array $filters): QueryBuilder
+    {
+        $queryBuilder = $this->createQueryBuilder('transaction')
+            ->join('transaction.brokerAccount', 'brokerAccount')
+            ->join('transaction.stock', 'stock')
+            ->andWhere('transaction.user = :user')
+            ->setParameter('user', $user);
+
+        if (($filters['symbol'] ?? null) !== null && $filters['symbol'] !== '') {
+            $queryBuilder
+                ->andWhere('stock.symbol LIKE :symbol')
+                ->setParameter('symbol', strtoupper($filters['symbol']).'%');
+        }
+
+        if (($filters['brokerAccountId'] ?? null) !== null) {
+            $queryBuilder
+                ->andWhere('brokerAccount.id = :brokerAccountId')
+                ->setParameter('brokerAccountId', $filters['brokerAccountId']);
+        }
+
+        if (($filters['type'] ?? null) !== null && $filters['type'] !== '') {
+            $queryBuilder
+                ->andWhere('transaction.type = :type')
+                ->setParameter('type', strtoupper($filters['type']));
+        }
+
+        if (($filters['dateFrom'] ?? null) instanceof \DateTimeImmutable) {
+            $queryBuilder
+                ->andWhere('transaction.transactionDate >= :dateFrom')
+                ->setParameter('dateFrom', $filters['dateFrom']);
+        }
+
+        if (($filters['dateTo'] ?? null) instanceof \DateTimeImmutable) {
+            $queryBuilder
+                ->andWhere('transaction.transactionDate <= :dateTo')
+                ->setParameter('dateTo', $filters['dateTo']);
+        }
+
+        return $queryBuilder;
     }
 
     /**

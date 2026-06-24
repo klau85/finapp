@@ -151,6 +151,8 @@ class PortfolioController extends AbstractController
                 'price' => $transaction->getPrice(),
                 'fees' => $transaction->getFees(),
                 'currency' => $transaction->getCurrency(),
+                'brokerAmount' => $transaction->getBrokerAmount(),
+                'brokerCurrency' => $transaction->getBrokerCurrency(),
                 'totalAmount' => DecimalMath::add(
                     DecimalMath::mul($transaction->getQuantity(), $transaction->getPrice()),
                     $transaction->getFees()

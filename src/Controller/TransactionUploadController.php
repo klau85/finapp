@@ -178,7 +178,9 @@ class TransactionUploadController extends AbstractController
                     ->setQuantity($data['quantity'])
                     ->setPrice($data['price'])
                     ->setCurrency($data['currency'])
-                    ->setFees($data['fees']);
+                    ->setFees($data['fees'])
+                    ->setBrokerAmount($data['brokerAmount'] ?? null)
+                    ->setBrokerCurrency($data['brokerCurrency'] ?? null);
 
                 $entityManager->persist($transaction);
                 ++$importedCount;

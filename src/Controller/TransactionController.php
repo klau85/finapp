@@ -18,6 +18,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class TransactionController extends AbstractController
 {
+    private const TRANSACTIONS_PER_PAGE = 50;
+
     #[Route('/transactions', name: 'app_transactions')]
     public function index(
         Request $request,
@@ -28,7 +30,18 @@ class TransactionController extends AbstractController
         \assert($user instanceof User);
 
         $filters = $this->buildFilters($request);
-        $transactions = $transactionRepository->findFilteredForUser($user, $filters);
+        $totalTransactions = $transactionRepository->countFilteredForUser($user, $filters);
+        $totalPages = max(1, (int) ceil($totalTransactions / self::TRANSACTIONS_PER_PAGE));
+        $currentPage = max(1, $request->query->getInt('page', 1));
+        $currentPage = min($currentPage, $totalPages);
+        $transactions = $transactionRepository->findFilteredForUser(
+            $user,
+            $filters,
+            self::TRANSACTIONS_PER_PAGE,
+            ($currentPage - 1) * self::TRANSACTIONS_PER_PAGE,
+        );
+        $queryParams = $request->query->all();
+        unset($queryParams['page']);
 
         return $this->render('transactions/index.html.twig', [
             'transactions' => array_map(static fn ($transaction): array => [
@@ -45,6 +58,15 @@ class TransactionController extends AbstractController
                 'type' => (string) $request->query->get('type', ''),
                 'dateFrom' => (string) $request->query->get('dateFrom', ''),
                 'dateTo' => (string) $request->query->get('dateTo', ''),
+            ],
+            'pagination' => [
+                'currentPage' => $currentPage,
+                'totalPages' => $totalPages,
+                'perPage' => self::TRANSACTIONS_PER_PAGE,
+                'totalItems' => $totalTransactions,
+                'queryParams' => $queryParams,
+                'firstItem' => $totalTransactions === 0 ? 0 : (($currentPage - 1) * self::TRANSACTIONS_PER_PAGE) + 1,
+                'lastItem' => min($currentPage * self::TRANSACTIONS_PER_PAGE, $totalTransactions),
             ],
         ]);
     }

@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 final class CsvTransactionParser
 {
     private const REQUIRED_COLUMNS = ['date', 'symbol', 'type', 'quantity', 'price', 'currency', 'fees'];
-    private const XTB_REQUIRED_COLUMNS = ['type', 'ticker', 'time', 'comment'];
+    private const XTB_REQUIRED_COLUMNS = ['type', 'ticker', 'time', 'comment', 'amount'];
 
     /**
      * @return list<ParsedCsvRow>
@@ -250,6 +250,12 @@ final class CsvTransactionParser
             $errors[] = 'comment must contain quantity and price in the expected XTB format.';
         }
 
+        $brokerAmount = $this->normalizeAbsoluteDecimal($data['amount']);
+        if ($brokerAmount === null) {
+            $errors[] = 'amount must be a decimal value.';
+            $brokerAmount = $data['amount'];
+        }
+
         return [[
             'date' => $date?->format('Y-m-d') ?? $data['time'],
             'transactionDate' => $date?->format('Y-m-d H:i:s') ?? $data['time'],
@@ -257,8 +263,10 @@ final class CsvTransactionParser
             'type' => $type ?? $data['type'],
             'quantity' => $quantity,
             'price' => $price,
-            'currency' => strtoupper($currency),
+            'currency' => 'USD',
             'fees' => '0.00000000',
+            'brokerAmount' => $brokerAmount,
+            'brokerCurrency' => strtoupper($currency),
         ], $errors];
     }
 
@@ -313,5 +321,32 @@ final class CsvTransactionParser
     private function isDecimal(string $value): bool
     {
         return preg_match('/^\d+(?:\.\d+)?$/', trim($value)) === 1;
+    }
+
+    private function normalizeAbsoluteDecimal(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        $value = str_replace(["\xc2\xa0", ' ', "'"], '', $value);
+        $lastComma = strrpos($value, ',');
+        $lastDot = strrpos($value, '.');
+
+        if ($lastComma !== false && $lastDot !== false) {
+            $decimalSeparator = $lastComma > $lastDot ? ',' : '.';
+            $thousandsSeparator = $decimalSeparator === ',' ? '.' : ',';
+            $value = str_replace($thousandsSeparator, '', $value);
+            $value = str_replace($decimalSeparator, '.', $value);
+        } elseif ($lastComma !== false) {
+            $value = str_replace(',', '.', $value);
+        }
+
+        if (preg_match('/^-?\d+(?:\.\d+)?$/', $value) !== 1) {
+            return null;
+        }
+
+        return DecimalMath::normalize(ltrim($value, '-'));
     }
 }
