@@ -64,7 +64,7 @@ class TransactionUploadController extends AbstractController
             return $this->redirectToRoute('app_transaction_upload');
         }
 
-        $parsedRows = $parser->parse($file);
+        $parsedRows = $parser->parse($file, $brokerAccount);
         $rows = array_map(static fn ($row): array => [
             'rowNumber' => $row->rowNumber,
             'data' => $row->data,
@@ -72,12 +72,18 @@ class TransactionUploadController extends AbstractController
             'valid' => $row->isValid(),
         ], $parsedRows);
         $hasErrors = array_any($rows, static fn (array $row): bool => !$row['valid']);
+        $validRowCount = count(array_filter($rows, static fn (array $row): bool => $row['valid']));
+        $invalidRowCount = count($rows) - $validRowCount;
+        $canImport = $validRowCount > 0;
 
         $request->getSession()->set(self::PREVIEW_SESSION_KEY, [
             'brokerAccountId' => $brokerAccount->getId(),
             'originalFileName' => $file->getClientOriginalName(),
             'rows' => $rows,
             'hasErrors' => $hasErrors,
+            'validRowCount' => $validRowCount,
+            'invalidRowCount' => $invalidRowCount,
+            'canImport' => $canImport,
         ]);
 
         return $this->render('transactions/preview.html.twig', [
@@ -85,7 +91,10 @@ class TransactionUploadController extends AbstractController
             'originalFileName' => $file->getClientOriginalName(),
             'rows' => $rows,
             'hasErrors' => $hasErrors,
-        ], new Response(status: $hasErrors ? Response::HTTP_UNPROCESSABLE_ENTITY : Response::HTTP_OK));
+            'validRowCount' => $validRowCount,
+            'invalidRowCount' => $invalidRowCount,
+            'canImport' => $canImport,
+        ], new Response(status: $canImport ? Response::HTTP_OK : Response::HTTP_UNPROCESSABLE_ENTITY));
     }
 
     #[Route('/transactions/upload/confirm', name: 'app_transaction_upload_confirm', methods: ['POST'])]
@@ -104,7 +113,7 @@ class TransactionUploadController extends AbstractController
         }
 
         $preview = $request->getSession()->get(self::PREVIEW_SESSION_KEY);
-        if (!is_array($preview) || ($preview['hasErrors'] ?? true) === true) {
+        if (!is_array($preview) || ($preview['canImport'] ?? false) !== true) {
             $this->addFlash('danger', 'There is no valid preview to import.');
 
             return $this->redirectToRoute('app_transaction_upload');
@@ -116,6 +125,7 @@ class TransactionUploadController extends AbstractController
         }
 
         $importedCount = 0;
+        $skippedCount = (int) ($preview['invalidRowCount'] ?? 0);
 
         $entityManager->wrapInTransaction(function () use (
             $entityManager,
@@ -157,7 +167,7 @@ class TransactionUploadController extends AbstractController
                 }
                 $stockCache[$stockKey] = $stock;
 
-                $transactionDate = new \DateTimeImmutable($data['date'].' 00:00:00', new \DateTimeZone('UTC'));
+                $transactionDate = new \DateTimeImmutable($data['transactionDate'] ?? $data['date'].' 00:00:00', new \DateTimeZone('UTC'));
                 $transaction = (new Transaction())
                     ->setUser($user)
                     ->setBrokerAccount($brokerAccount)
@@ -185,7 +195,12 @@ class TransactionUploadController extends AbstractController
 
         $request->getSession()->remove(self::PREVIEW_SESSION_KEY);
 
-        $this->addFlash('success', sprintf('Imported %d transactions into %s.', $importedCount, $brokerAccount->getDisplayName()));
+        $message = sprintf('Imported %d transactions into %s.', $importedCount, $brokerAccount->getDisplayName());
+        if ($skippedCount > 0) {
+            $message .= sprintf(' Skipped %d invalid row%s.', $skippedCount, $skippedCount === 1 ? '' : 's');
+        }
+
+        $this->addFlash('success', $message);
 
         return $this->redirectToRoute('app_transactions');
     }

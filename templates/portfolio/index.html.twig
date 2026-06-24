@@ -20,7 +20,14 @@
             grid-auto-flow: column;
             grid-template-rows: repeat(5, auto);
             justify-content: start;
+            min-width: max-content;
             row-gap: .75rem;
+        }
+
+        .portfolio-exposure-legend-scroll {
+            max-width: 100%;
+            overflow-x: auto;
+            padding-bottom: .5rem;
         }
 
         .portfolio-exposure-item {
@@ -120,20 +127,22 @@
                         <canvas id="portfolio-exposure-chart" class="portfolio-exposure-chart" width="320" height="320" aria-label="Portfolio exposure by stock" role="img"></canvas>
                     </div>
                     <div class="col-lg-7">
-                        <div id="portfolio-exposure-legend" class="portfolio-exposure-legend">
-                            {% for item in exposure %}
-                                <div class="portfolio-exposure-item">
-                                    <span class="portfolio-exposure-swatch" data-exposure-swatch="{{ loop.index0 }}"></span>
-                                    <div class="min-w-0">
-                                        <div class="fw-semibold text-truncate">{{ item.symbol }}</div>
-                                        <div class="small text-secondary text-truncate">{{ item.companyName ?: 'Company name not available' }}</div>
+                        <div class="portfolio-exposure-legend-scroll">
+                            <div id="portfolio-exposure-legend" class="portfolio-exposure-legend">
+                                {% for item in exposure %}
+                                    <div class="portfolio-exposure-item">
+                                        <span class="portfolio-exposure-swatch" data-exposure-swatch="{{ loop.index0 }}"></span>
+                                        <div class="min-w-0">
+                                            <div class="fw-semibold text-truncate">{{ item.symbol }}</div>
+                                            <div class="small text-secondary text-truncate">{{ item.companyName ?: 'Company name not available' }}</div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-semibold">{{ item.percent|trim_number }}%</div>
+                                            <div class="small text-secondary">{{ item.marketValue|money_symbol(item.currency) }}</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="fw-semibold">{{ item.percent|trim_number }}%</div>
-                                        <div class="small text-secondary">{{ item.marketValue|money_symbol(item.currency) }}</div>
-                                    </div>
-                                </div>
-                            {% endfor %}
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>

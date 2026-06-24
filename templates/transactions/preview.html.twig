@@ -24,13 +24,25 @@
                 </div>
                 <div class="col-md-4">
                     <div class="text-secondary small">Status</div>
-                    {% if hasErrors %}
+                    {% if hasErrors and canImport %}
+                        <span class="badge text-bg-warning">Partial import</span>
+                    {% elseif hasErrors %}
                         <span class="badge text-bg-danger">Validation errors</span>
                     {% else %}
                         <span class="badge text-bg-success">Ready to import</span>
                     {% endif %}
                 </div>
             </div>
+            {% if hasErrors %}
+                <div class="alert {{ canImport ? 'alert-warning' : 'alert-danger' }} mt-3 mb-0">
+                    {% if canImport %}
+                        {{ validRowCount }} valid row{{ validRowCount == 1 ? '' : 's' }} will be imported.
+                        {{ invalidRowCount }} invalid row{{ invalidRowCount == 1 ? '' : 's' }} will be skipped.
+                    {% else %}
+                        No valid rows were found. Fix the CSV and upload it again.
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
     </div>
 
@@ -91,8 +103,8 @@
             <div class="d-flex justify-content-end mt-3">
                 <form action="{{ path('app_transaction_upload_confirm') }}" method="post">
                     <input type="hidden" name="_token" value="{{ csrf_token('transaction_upload_confirm') }}">
-                    <button class="btn btn-dark" type="submit" {{ hasErrors ? 'disabled' }}>
-                        Confirm import
+                    <button class="btn btn-dark" type="submit" {{ canImport ? '' : 'disabled' }}>
+                        {{ hasErrors ? 'Import valid rows' : 'Confirm import' }}
                     </button>
                 </form>
             </div>
