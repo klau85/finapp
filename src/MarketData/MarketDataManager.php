@@ -30,8 +30,6 @@ final readonly class MarketDataManager
         private LoggerInterface $logger,
         #[Autowire('%kernel.environment%')]
         private string $environment,
-        #[Autowire('%env(int:MARKET_QUOTE_TTL_MINUTES)%')]
-        private int $quoteTtlMinutes,
         #[Autowire('%env(bool:MARKET_ALLOW_MOCK_PROVIDER)%')]
         private bool $allowMockProvider,
     ) {
@@ -41,14 +39,14 @@ final readonly class MarketDataManager
     {
         $cached = $this->stockQuoteRepository->findLatestForStock($stock);
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $freshAfter = $now->modify(sprintf('-%d minutes', max(1, $this->quoteTtlMinutes)));
+        $freshAfter = $now->modify(sprintf('-%d minutes', $this->currentQuoteTtlMinutes($now)));
 
         if ($cached !== null && $cached->getFetchedAt() >= $freshAfter) {
             return $this->quoteFromEntity($cached);
         }
 
         $providerException = null;
-        foreach ($this->realProviders($stock) as $provider) {
+        foreach ($this->quoteProviders($stock) as $provider) {
             try {
                 $quote = $provider->getCurrentQuote($stock);
                 $this->storeQuote($stock, $quote, $now);
@@ -110,7 +108,7 @@ final readonly class MarketDataManager
 
         $fetchFrom = $latest !== null ? $latest->getDate() : $from;
         $providerException = null;
-        foreach ($this->realProviders($stock) as $provider) {
+        foreach ($this->ohlcProviders($stock) as $provider) {
             try {
                 $candles = $provider->getDailyOhlc($stock, $fetchFrom, $today);
                 $this->storeCandles($stock, $candles, $now);
@@ -192,10 +190,50 @@ final readonly class MarketDataManager
         );
     }
 
+    private function currentQuoteTtlMinutes(\DateTimeImmutable $now): int
+    {
+        return $this->isUsMarketOpen($now) ? 15 : 60;
+    }
+
+    private function isUsMarketOpen(\DateTimeImmutable $now): bool
+    {
+        $marketTime = $now->setTimezone(new \DateTimeZone('America/New_York'));
+        $dayOfWeek = (int) $marketTime->format('N');
+        if ($dayOfWeek >= 6) {
+            return false;
+        }
+
+        $minutes = ((int) $marketTime->format('H')) * 60 + (int) $marketTime->format('i');
+
+        return $minutes >= (9 * 60 + 30) && $minutes < (16 * 60);
+    }
+
     /**
      * @return list<MarketDataProviderInterface>
      */
-    private function realProviders(Stock $stock): array
+    private function quoteProviders(Stock $stock): array
+    {
+        $providers = [];
+
+        if ($this->yahooProvider->supports($stock)) {
+            $providers[] = $this->yahooProvider;
+        }
+
+        if ($this->twelveDataProvider->supports($stock)) {
+            $providers[] = $this->twelveDataProvider;
+        }
+
+        if ($providers === []) {
+            throw new MarketDataProviderException(sprintf('No real market data provider supports %s.', $stock->getSymbol()));
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return list<MarketDataProviderInterface>
+     */
+    private function ohlcProviders(Stock $stock): array
     {
         $providers = [];
 

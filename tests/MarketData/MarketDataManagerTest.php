@@ -59,18 +59,20 @@ final class MarketDataManagerTest extends TestCase
         $manager = $this->manager(
             $quoteRepository,
             entityManager: $entityManager,
-            twelveDataClient: $this->twelveDataClient('{"symbol":"NVDA","currency":"USD","close":"147.5","change":"3.4","percent_change":"2.3594"}'),
+            apiClient: $this->apiClient(quote: new Quote([
+                'symbol' => 'NVDA',
+                'currency' => 'USD',
+                'regularMarketPrice' => 148.5,
+            ])),
         );
 
         $quote = $manager->getCurrentQuote($stock);
 
-        self::assertSame('147.50000000', $quote->price);
-        self::assertSame('3.40000000', $quote->change);
-        self::assertSame('2.3594', $quote->changePercent);
-        self::assertSame('twelvedata', $quote->provider);
+        self::assertSame('148.50000000', $quote->price);
+        self::assertSame('yahoo', $quote->provider);
     }
 
-    public function testQuoteFallsBackToYahooWhenTwelveDataFails(): void
+    public function testQuoteFallsBackToTwelveDataWhenYahooFails(): void
     {
         $stock = $this->stock();
         $quoteRepository = $this->createMock(StockQuoteRepository::class);
@@ -78,16 +80,24 @@ final class MarketDataManagerTest extends TestCase
 
         $quote = $this->manager(
             $quoteRepository,
-            twelveDataClient: $this->twelveDataClient('{"status":"error","message":"rate limit","code":429}'),
-            apiClient: $this->apiClient(quote: new Quote([
-                'symbol' => 'NVDA',
-                'currency' => 'USD',
-                'regularMarketPrice' => 148.5,
-            ])),
+            twelveDataClient: $this->twelveDataClient('{"symbol":"NVDA","currency":"USD","close":"147.5","change":"3.4","percent_change":"2.3594"}'),
         )->getCurrentQuote($stock);
 
-        self::assertSame('148.50000000', $quote->price);
-        self::assertSame('yahoo', $quote->provider);
+        self::assertSame('147.50000000', $quote->price);
+        self::assertSame('3.40000000', $quote->change);
+        self::assertSame('2.3594', $quote->changePercent);
+        self::assertSame('twelvedata', $quote->provider);
+    }
+
+    public function testQuoteCacheTtlIsFifteenMinutesDuringUsMarketHours(): void
+    {
+        self::assertSame(15, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 14:00:00', new \DateTimeZone('UTC'))));
+    }
+
+    public function testQuoteCacheTtlIsSixtyMinutesOutsideUsMarketHours(): void
+    {
+        self::assertSame(60, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 22:00:00', new \DateTimeZone('UTC'))));
+        self::assertSame(60, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-27 14:00:00', new \DateTimeZone('UTC'))));
     }
 
     public function testOhlcCacheHitReturnsCachedCandles(): void
@@ -244,9 +254,15 @@ final class MarketDataManagerTest extends TestCase
             new MockMarketDataProvider(new MockPriceService()),
             new NullLogger(),
             $environment,
-            60,
             $allowMock,
         );
+    }
+
+    private function quoteTtlMinutes(\DateTimeImmutable $now): int
+    {
+        $method = new \ReflectionMethod(MarketDataManager::class, 'currentQuoteTtlMinutes');
+
+        return $method->invoke($this->manager(), $now);
     }
 
     private function stock(): Stock
