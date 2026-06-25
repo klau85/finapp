@@ -11,6 +11,7 @@ final class CsvTransactionParser
 {
     private const REQUIRED_COLUMNS = ['date', 'symbol', 'type', 'quantity', 'price', 'currency', 'fees'];
     private const XTB_REQUIRED_COLUMNS = ['type', 'ticker', 'time', 'comment', 'amount'];
+    private const REVOLUT_REQUIRED_COLUMNS = ['date', 'ticker', 'type', 'quantity', 'price per share', 'currency'];
 
     /**
      * @return list<ParsedCsvRow>
@@ -19,6 +20,10 @@ final class CsvTransactionParser
     {
         if ($brokerAccount?->getBrokerType() === 'xtb') {
             return $this->parseXtb($file, $brokerAccount->getCurrency());
+        }
+
+        if ($brokerAccount?->getBrokerType() === 'revolut') {
+            return $this->parseRevolut($file);
         }
 
         return $this->parseCustom($file, $brokerAccount?->getCurrency() ?? 'USD');
@@ -126,6 +131,61 @@ final class CsvTransactionParser
             }
 
             [$data, $errors] = $this->normalizeXtb($xtbData, $currency);
+            $rows[] = new ParsedCsvRow($rowNumber, $data, $errors);
+        }
+
+        fclose($handle);
+
+        if ($rows === []) {
+            return [new ParsedCsvRow(1, [], ['CSV file contains no transaction rows.'])];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<ParsedCsvRow>
+     */
+    private function parseRevolut(UploadedFile $file): array
+    {
+        $handle = fopen($file->getPathname(), 'r');
+        if ($handle === false) {
+            return [new ParsedCsvRow(1, [], ['Could not read uploaded file.'])];
+        }
+
+        $delimiter = $this->detectDelimiter($handle);
+        $header = fgetcsv($handle, null, $delimiter, '"', '');
+        if ($header === false) {
+            fclose($handle);
+
+            return [new ParsedCsvRow(1, [], ['CSV file is empty.'])];
+        }
+
+        $header = array_map(static fn (string $column): string => strtolower(trim(ltrim($column, "\xEF\xBB\xBF"))), $header);
+        $missingColumns = array_values(array_diff(self::REVOLUT_REQUIRED_COLUMNS, $header));
+        if ($missingColumns !== []) {
+            fclose($handle);
+
+            return [new ParsedCsvRow(1, [], ['Missing required Revolut columns: '.implode(', ', $missingColumns).'.'])];
+        }
+
+        $columnIndexes = array_flip($header);
+        $rows = [];
+        $rowNumber = 1;
+
+        while (($csvRow = fgetcsv($handle, null, $delimiter, '"', '')) !== false) {
+            ++$rowNumber;
+
+            if ($csvRow === [null] || $this->isBlankRow($csvRow)) {
+                continue;
+            }
+
+            $revolutData = [];
+            foreach (self::REVOLUT_REQUIRED_COLUMNS as $column) {
+                $revolutData[$column] = trim((string) ($csvRow[$columnIndexes[$column]] ?? ''));
+            }
+
+            [$data, $errors] = $this->normalizeRevolut($revolutData);
             $rows[] = new ParsedCsvRow($rowNumber, $data, $errors);
         }
 
@@ -288,6 +348,73 @@ final class CsvTransactionParser
         ], $errors];
     }
 
+    /**
+     * @param array<string, string> $data
+     * @return array{0: array<string, string>, 1: list<string>}
+     */
+    private function normalizeRevolut(array $data): array
+    {
+        $errors = [];
+
+        $type = match (strtoupper($data['type'])) {
+            'BUY - MARKET' => 'BUY',
+            'SELL - MARKET' => 'SELL',
+            default => null,
+        };
+
+        if ($type === null) {
+            $errors[] = 'type must be BUY - MARKET or SELL - MARKET.';
+        }
+
+        $date = $this->parseRevolutDate($data['date']);
+        if (!$date instanceof \DateTimeImmutable) {
+            $errors[] = 'date must use a valid Revolut ISO timestamp.';
+        }
+
+        $symbol = strtoupper(trim($data['ticker']));
+        if ($symbol === '') {
+            $errors[] = 'ticker is required.';
+        }
+
+        $quantity = $this->isDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'];
+        if (!$this->isDecimal($data['quantity']) || DecimalMath::cmp($data['quantity'], '0.00000000') <= 0) {
+            $errors[] = 'quantity must be a positive decimal.';
+        }
+
+        $price = '';
+        $priceCurrency = '';
+        if (preg_match('/^([A-Z]{3})\s+(\d+(?:\.\d+)?)$/i', $data['price per share'], $matches) === 1) {
+            $priceCurrency = strtoupper($matches[1]);
+            $price = DecimalMath::normalize($matches[2]);
+
+            if ($priceCurrency !== 'USD') {
+                $errors[] = 'price per share currency must be USD.';
+            }
+
+            if (DecimalMath::cmp($price, '0.00000000') <= 0) {
+                $errors[] = 'price must be a positive decimal.';
+            }
+        } else {
+            $errors[] = 'price per share must use format "USD 50.56".';
+        }
+
+        $currency = strtoupper($data['currency']);
+        if ($currency !== 'USD') {
+            $errors[] = 'currency must be USD.';
+        }
+
+        return [[
+            'date' => $date?->format('Y-m-d') ?? $data['date'],
+            'transactionDate' => $date?->format('Y-m-d H:i:s') ?? $data['date'],
+            'symbol' => $symbol,
+            'type' => $type ?? $data['type'],
+            'quantity' => $quantity,
+            'price' => $price,
+            'currency' => $currency,
+            'fees' => '0.00000000',
+        ], $errors];
+    }
+
     private function parseXtbDate(string $value): ?\DateTimeImmutable
     {
         $timezone = new \DateTimeZone('UTC');
@@ -312,6 +439,21 @@ final class CsvTransactionParser
         return $date instanceof \DateTimeImmutable && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
             ? $date
             : null;
+    }
+
+    private function parseRevolutDate(string $value): ?\DateTimeImmutable
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/', $value) !== 1) {
+            return null;
+        }
+
+        try {
+            $date = new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
+
+        return $date->setTimezone(new \DateTimeZone('UTC'));
     }
 
     /**

@@ -95,7 +95,9 @@
                         </div>
                         <p class="text-secondary mb-0">Transactions are imported into the selected broker account only.<br>
                             Custom CSV import supports USD only; rows with another currency are marked invalid and skipped.<br>
-                            The optional amount column is saved as the broker amount in the selected broker account currency. In the example above the broker currency is EUR, so the amount is being saved in EUR.</p>
+                            The optional amount column is saved as the broker amount in the selected broker account currency. <br>
+                            In the example above the stock currency is USD and the price is in USD.
+                            The selected broker account currency is EUR, so the amount is in EUR.</p>
                     </div>
 
                     <div data-import-format="xtb" hidden>
@@ -135,6 +137,46 @@
                             Rows with non-US tickers are marked invalid and skipped.
                         </p>
                     </div>
+
+                    <div data-import-format="revolut" hidden>
+                        <h2 class="h5 mb-3">Revolut CSV format</h2>
+                        <p class="text-secondary">For Revolut broker accounts, upload the investments CSV downloaded from the Revolut app.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Ticker</th>
+                                        <th>Type</th>
+                                        <th>Quantity</th>
+                                        <th>Price per share</th>
+                                        <th>Currency</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>2021-10-14T10:28:43.503438Z</td>
+                                        <td>NVDA</td>
+                                        <td>BUY - MARKET</td>
+                                        <td>2</td>
+                                        <td>USD 50.56</td>
+                                        <td>USD</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2021-11-18T15:40:10.100000Z</td>
+                                        <td>AAPL</td>
+                                        <td>SELL - MARKET</td>
+                                        <td>1</td>
+                                        <td>USD 151.20</td>
+                                        <td>USD</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-secondary mb-0">Revolut imports support BUY - MARKET and SELL - MARKET rows only.<br>
+                            Rows with empty tickers, non-USD prices, or non-USD currency are marked invalid and skipped.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -154,7 +196,9 @@
 
             const updateImportFormat = () => {
                 const selectedOption = brokerSelect.options[brokerSelect.selectedIndex];
-                const brokerType = selectedOption?.dataset.brokerType === 'xtb' ? 'xtb' : 'custom';
+                const brokerType = ['xtb', 'revolut'].includes(selectedOption?.dataset.brokerType)
+                    ? selectedOption.dataset.brokerType
+                    : 'custom';
 
                 sections.forEach((section) => {
                     section.hidden = section.dataset.importFormat !== brokerType;

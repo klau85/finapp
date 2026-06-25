@@ -151,6 +151,66 @@ CSV), $account);
         self::assertContains('custom CSV import supports USD currency only.', $rows[0]->errors);
     }
 
+    public function testRevolutCsvMapsRowsToTransactionData(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('revolut')
+            ->setCurrency('USD');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+Date,Ticker,Type,Quantity,Price per share,Currency,Ignored
+2021-10-14T10:28:43.503438Z,NVDA,BUY - MARKET,2,USD 50.56,USD,abc
+2021-11-18T15:40:10.100000Z,AAPL,SELL - MARKET,1.25,USD 151.20,USD,xyz
+CSV), $account);
+
+        self::assertCount(2, $rows);
+        self::assertTrue($rows[0]->isValid());
+        self::assertSame([
+            'date' => '2021-10-14',
+            'transactionDate' => '2021-10-14 10:28:43',
+            'symbol' => 'NVDA',
+            'type' => 'BUY',
+            'quantity' => '2.00000000',
+            'price' => '50.56000000',
+            'currency' => 'USD',
+            'fees' => '0.00000000',
+        ], $rows[0]->data);
+
+        self::assertTrue($rows[1]->isValid());
+        self::assertSame('AAPL', $rows[1]->data['symbol']);
+        self::assertSame('SELL', $rows[1]->data['type']);
+        self::assertSame('1.25000000', $rows[1]->data['quantity']);
+        self::assertSame('151.20000000', $rows[1]->data['price']);
+    }
+
+    public function testRevolutCsvRejectsUnsupportedRows(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('revolut')
+            ->setCurrency('USD');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+Date,Ticker,Type,Quantity,Price per share,Currency
+2021-10-14T10:28:43.503438Z,NVDA,DIVIDEND,2,USD 50.56,USD
+2021-10-14T10:28:43.503438Z,,BUY - MARKET,2,USD 50.56,USD
+2021-10-14T10:28:43.503438Z,AAPL,BUY - MARKET,2,EUR 50.56,USD
+2021-10-14T10:28:43.503438Z,MSFT,BUY - MARKET,2,USD 50.56,EUR
+CSV), $account);
+
+        self::assertCount(4, $rows);
+        self::assertFalse($rows[0]->isValid());
+        self::assertContains('type must be BUY - MARKET or SELL - MARKET.', $rows[0]->errors);
+
+        self::assertFalse($rows[1]->isValid());
+        self::assertContains('ticker is required.', $rows[1]->errors);
+
+        self::assertFalse($rows[2]->isValid());
+        self::assertContains('price per share currency must be USD.', $rows[2]->errors);
+
+        self::assertFalse($rows[3]->isValid());
+        self::assertContains('currency must be USD.', $rows[3]->errors);
+    }
+
     private function uploadedFile(string $contents): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'csv-parser-');
