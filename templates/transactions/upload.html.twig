@@ -33,7 +33,7 @@
                                 <select id="brokerAccountId" name="brokerAccountId" class="form-select" required>
                                     <option value="">Select account</option>
                                     {% for account in brokerAccounts %}
-                                        <option value="{{ account.id }}">{{ account.displayName }} · {{ account.brokerTypeLabel }} · {{ account.currency }}</option>
+                                        <option value="{{ account.id }}" data-broker-type="{{ account.brokerType }}">{{ account.displayName }} · {{ account.brokerTypeLabel }} · {{ account.currency }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -53,78 +53,116 @@
         <div class="col-lg-7">
             <div class="card">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">Custom CSV format</h2>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle">
-                            <thead>
-                                <tr>
-                                    <th>date</th>
-                                    <th>symbol</th>
-                                    <th>type</th>
-                                    <th>quantity</th>
-                                    <th>price</th>
-                                    <th>currency</th>
-                                    <th>fees</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>2026-02-12</td>
-                                    <td>NVDA</td>
-                                    <td><span class="badge badge-buy">BUY</span></td>
-                                    <td>100</td>
-                                    <td>142.50</td>
-                                    <td>USD</td>
-                                    <td>1.00</td>
-                                </tr>
-                                <tr>
-                                    <td>2026-03-13</td>
-                                    <td>CRWD</td>
-                                    <td><span class="badge badge-sell">SELL</span></td>
-                                    <td>50</td>
-                                    <td>520.00</td>
-                                    <td>USD</td>
-                                    <td>1.00</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div data-import-format="custom">
+                        <h2 class="h5 mb-3">Custom CSV format</h2>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>date</th>
+                                        <th>symbol</th>
+                                        <th>type</th>
+                                        <th>quantity</th>
+                                        <th>price</th>
+                                        <th>currency</th>
+                                        <th>fees</th>
+                                        <th>amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>2026-02-12</td>
+                                        <td>NVDA</td>
+                                        <td><span class="badge badge-buy">BUY</span></td>
+                                        <td>100</td>
+                                        <td>142.50</td>
+                                        <td>USD</td>
+                                        <td>1.00</td>
+                                        <td>14250.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2026-03-13</td>
+                                        <td>CRWD</td>
+                                        <td><span class="badge badge-sell">SELL</span></td>
+                                        <td>50</td>
+                                        <td>520.00</td>
+                                        <td>USD</td>
+                                        <td>1.00</td>
+                                        <td>26000.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-secondary mb-0">Transactions are imported into the selected broker account only.<br>
+                            Custom CSV import supports USD only; rows with another currency are marked invalid and skipped.<br>
+                            The optional amount column is saved as the broker amount in the selected broker account currency.</p>
                     </div>
-                    <p class="text-secondary mb-4">Broker is not included in the CSV. Transactions are imported into the selected broker account only.</p>
 
-                    <h2 class="h5 mb-3">XTB CSV format</h2>
-                    <p class="text-secondary">For XTB broker accounts, upload the CSV downloaded from XTB. The importer reads these columns and ignores the rest. Only tickers ending in .US are imported.</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle">
-                            <thead>
-                                <tr>
-                                    <th>Type</th>
-                                    <th>Ticker</th>
-                                    <th>Time</th>
-                                    <th>Comment</th>
-                                    <th>Amount</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Stock purchase</td>
-                                    <td>NVDA.US</td>
-                                    <td>2026-02-12 9:15:00</td>
-                                    <td>OPEN BUY 1/1.18 @ 43.37</td>
-                                    <td>-43.37</td>
-                                </tr>
-                                <tr>
-                                    <td>Stock sell</td>
-                                    <td>MSFT.US</td>
-                                    <td>2026-03-13 14:30:00</td>
-                                    <td>CLOSE BUY 0.14/0.34 @ 645.64</td>
-                                    <td>90.39</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div data-import-format="xtb" hidden>
+                        <h2 class="h5 mb-3">XTB CSV format</h2>
+                        <p class="text-secondary">For XTB broker accounts, upload the CSV downloaded from XTB.</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Ticker</th>
+                                        <th>Time</th>
+                                        <th>Comment</th>
+                                        <th>Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Stock purchase</td>
+                                        <td>NVDA.US</td>
+                                        <td>2026-02-12 9:15:00</td>
+                                        <td>OPEN BUY 1/1.18 @ 43.37</td>
+                                        <td>-43.37</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Stock sell</td>
+                                        <td>MSFT.US</td>
+                                        <td>2026-03-13 14:30:00</td>
+                                        <td>CLOSE BUY 0.14/0.34 @ 645.64</td>
+                                        <td>90.39</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD price/currency. <br>
+                            The absolute Amount value is saved separately in the selected broker account currency.<br>
+                            Rows with non-US tickers are marked invalid and skipped.
+                        </p>
                     </div>
-                    <p class="text-secondary mb-0">XTB imports save the Comment price as USD price/currency. The absolute Amount value is saved separately in the selected broker account currency. Fees are set to 0. Rows with non-US tickers are marked invalid and skipped.</p>
                 </div>
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const brokerSelect = document.getElementById('brokerAccountId');
+            const sections = document.querySelectorAll('[data-import-format]');
+
+            if (!brokerSelect || sections.length === 0) {
+                return;
+            }
+
+            const updateImportFormat = () => {
+                const selectedOption = brokerSelect.options[brokerSelect.selectedIndex];
+                const brokerType = selectedOption?.dataset.brokerType === 'xtb' ? 'xtb' : 'custom';
+
+                sections.forEach((section) => {
+                    section.hidden = section.dataset.importFormat !== brokerType;
+                });
+            };
+
+            brokerSelect.addEventListener('change', updateImportFormat);
+            updateImportFormat();
+        });
+    </script>
 {% endblock %}

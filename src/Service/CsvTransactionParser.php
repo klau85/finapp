@@ -21,13 +21,13 @@ final class CsvTransactionParser
             return $this->parseXtb($file, $brokerAccount->getCurrency());
         }
 
-        return $this->parseCustom($file);
+        return $this->parseCustom($file, $brokerAccount?->getCurrency() ?? 'USD');
     }
 
     /**
      * @return list<ParsedCsvRow>
      */
-    private function parseCustom(UploadedFile $file): array
+    private function parseCustom(UploadedFile $file, string $brokerCurrency): array
     {
         $handle = fopen($file->getPathname(), 'r');
         if ($handle === false) {
@@ -66,7 +66,12 @@ final class CsvTransactionParser
                 $data[$column] = trim((string) ($csvRow[$columnIndexes[$column]] ?? ''));
             }
 
-            $rows[] = new ParsedCsvRow($rowNumber, $this->normalize($data), $this->validate($data));
+            if (isset($columnIndexes['amount'])) {
+                $data['amount'] = trim((string) ($csvRow[$columnIndexes['amount']] ?? ''));
+            }
+
+            $normalized = $this->normalize($data, $brokerCurrency);
+            $rows[] = new ParsedCsvRow($rowNumber, $normalized, $this->validate($data));
         }
 
         fclose($handle);
@@ -151,9 +156,9 @@ final class CsvTransactionParser
      * @param array<string, string> $data
      * @return array<string, string>
      */
-    private function normalize(array $data): array
+    private function normalize(array $data, string $brokerCurrency): array
     {
-        return [
+        $normalized = [
             'date' => $data['date'],
             'symbol' => strtoupper($data['symbol']),
             'type' => strtoupper($data['type']),
@@ -162,6 +167,13 @@ final class CsvTransactionParser
             'currency' => strtoupper($data['currency']),
             'fees' => $this->isDecimal($data['fees']) ? DecimalMath::normalize($data['fees']) : $data['fees'],
         ];
+
+        if (($data['amount'] ?? '') !== '' && ($brokerAmount = $this->normalizeAbsoluteDecimal($data['amount'])) !== null) {
+            $normalized['brokerAmount'] = $brokerAmount;
+            $normalized['brokerCurrency'] = strtoupper($brokerCurrency);
+        }
+
+        return $normalized;
     }
 
     /**
@@ -197,6 +209,12 @@ final class CsvTransactionParser
 
         if (!preg_match('/^[A-Z]{3}$/', strtoupper($data['currency']))) {
             $errors[] = 'currency must be a 3-letter code.';
+        } elseif (strtoupper($data['currency']) !== 'USD') {
+            $errors[] = 'custom CSV import supports USD currency only.';
+        }
+
+        if (($data['amount'] ?? '') !== '' && $this->normalizeAbsoluteDecimal($data['amount']) === null) {
+            $errors[] = 'amount must be a decimal value.';
         }
 
         return $errors;

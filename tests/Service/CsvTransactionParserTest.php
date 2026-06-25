@@ -100,6 +100,57 @@ CSV), $account);
         self::assertSame('1.00000000', $rows[0]->data['fees']);
     }
 
+    public function testCustomCsvOptionalAmountIsStoredAsBrokerAmount(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('custom')
+            ->setCurrency('EUR');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+date;symbol;type;quantity;price;currency;fees;amount
+2026-02-12;nvda;buy;100;142.50;usd;1.00;-13000,50
+CSV), $account);
+
+        self::assertCount(1, $rows);
+        self::assertTrue($rows[0]->isValid());
+        self::assertSame('13000.50000000', $rows[0]->data['brokerAmount']);
+        self::assertSame('EUR', $rows[0]->data['brokerCurrency']);
+    }
+
+    public function testCustomCsvRejectsInvalidOptionalAmount(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('custom')
+            ->setCurrency('USD');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+date,symbol,type,quantity,price,currency,fees,amount
+2026-02-12,nvda,buy,100,142.50,usd,1.00,not-a-number
+CSV), $account);
+
+        self::assertCount(1, $rows);
+        self::assertFalse($rows[0]->isValid());
+        self::assertArrayNotHasKey('brokerAmount', $rows[0]->data);
+        self::assertContains('amount must be a decimal value.', $rows[0]->errors);
+    }
+
+    public function testCustomCsvRejectsNonUsdCurrency(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('custom')
+            ->setCurrency('EUR');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+date,symbol,type,quantity,price,currency,fees
+2026-02-12,nvda,buy,100,142.50,eur,1.00
+CSV), $account);
+
+        self::assertCount(1, $rows);
+        self::assertFalse($rows[0]->isValid());
+        self::assertSame('EUR', $rows[0]->data['currency']);
+        self::assertContains('custom CSV import supports USD currency only.', $rows[0]->errors);
+    }
+
     private function uploadedFile(string $contents): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'csv-parser-');
