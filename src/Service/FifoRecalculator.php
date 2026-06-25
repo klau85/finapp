@@ -20,8 +20,6 @@ final readonly class FifoRecalculator
      */
     public function recalculateForUser(User $user): array
     {
-        $this->portfolioAnalytics->recalculateForUser($user);
-
-        return [];
+        return $this->portfolioAnalytics->recalculateForUser($user);
     }
 }

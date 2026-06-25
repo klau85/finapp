@@ -9,7 +9,6 @@ use App\Entity\ImportFile;
 use App\Entity\Stock;
 use App\Entity\Transaction;
 use App\Entity\User;
-use App\Exception\InsufficientSharesForSellException;
 use App\Repository\BrokerAccountRepository;
 use App\Repository\StockRepository;
 use App\Service\CsvTransactionParser;
@@ -187,13 +186,7 @@ class TransactionUploadController extends AbstractController
             }
         });
 
-        try {
-            $portfolioAnalytics->recalculateForUser($user);
-        } catch (InsufficientSharesForSellException $exception) {
-            $this->addFlash('danger', $exception->getMessage());
-
-            return $this->redirectToRoute('app_transaction_upload');
-        }
+        $analyticsWarnings = $portfolioAnalytics->recalculateForUser($user);
 
         $request->getSession()->remove(self::PREVIEW_SESSION_KEY);
 
@@ -203,6 +196,9 @@ class TransactionUploadController extends AbstractController
         }
 
         $this->addFlash('success', $message);
+        foreach ($analyticsWarnings as $warning) {
+            $this->addFlash('warning', $warning);
+        }
 
         return $this->redirectToRoute('app_transactions');
     }

@@ -17,21 +17,27 @@ use App\Service\DecimalMath;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\RequestStack;
 
-final readonly class MarketDataManager
+final class MarketDataManager
 {
+    private const MAX_API_REQUESTS_PER_PAGE = 5;
+
+    private int $apiRequestsThisPage = 0;
+
     public function __construct(
-        private EntityManagerInterface $entityManager,
-        private StockQuoteRepository $stockQuoteRepository,
-        private StockPriceRepository $stockPriceRepository,
-        private TwelveDataProvider $twelveDataProvider,
-        private YahooProvider $yahooProvider,
-        private MockMarketDataProvider $mockProvider,
-        private LoggerInterface $logger,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly StockQuoteRepository $stockQuoteRepository,
+        private readonly StockPriceRepository $stockPriceRepository,
+        private readonly TwelveDataProvider $twelveDataProvider,
+        private readonly YahooProvider $yahooProvider,
+        private readonly MockMarketDataProvider $mockProvider,
+        private readonly LoggerInterface $logger,
+        private readonly RequestStack $requestStack,
         #[Autowire('%kernel.environment%')]
-        private string $environment,
+        private readonly string $environment,
         #[Autowire('%env(bool:MARKET_ALLOW_MOCK_PROVIDER)%')]
-        private bool $allowMockProvider,
+        private readonly bool $allowMockProvider,
     ) {
     }
 
@@ -47,6 +53,10 @@ final readonly class MarketDataManager
 
         $providerException = null;
         foreach ($this->quoteProviders($stock) as $provider) {
+            if (!$this->reserveApiRequest($stock, $provider, 'quote')) {
+                break;
+            }
+
             try {
                 $quote = $provider->getCurrentQuote($stock);
                 $this->storeQuote($stock, $quote, $now);
@@ -109,6 +119,10 @@ final readonly class MarketDataManager
         $fetchFrom = $latest !== null ? $latest->getDate() : $from;
         $providerException = null;
         foreach ($this->ohlcProviders($stock) as $provider) {
+            if (!$this->reserveApiRequest($stock, $provider, 'ohlc')) {
+                break;
+            }
+
             try {
                 $candles = $provider->getDailyOhlc($stock, $fetchFrom, $latestRequiredMarketDay);
                 $this->storeCandles($stock, $candles, $now);
@@ -281,6 +295,28 @@ final readonly class MarketDataManager
     private function canUseMockProvider(): bool
     {
         return $this->environment !== 'prod' && $this->allowMockProvider;
+    }
+
+    private function reserveApiRequest(Stock $stock, MarketDataProviderInterface $provider, string $purpose): bool
+    {
+        if ($this->requestStack->getCurrentRequest() === null) {
+            return true;
+        }
+
+        if ($this->apiRequestsThisPage >= self::MAX_API_REQUESTS_PER_PAGE) {
+            $this->logger->info('Market data API request limit reached for page render.', [
+                'symbol' => $stock->getSymbol(),
+                'provider' => $provider::class,
+                'purpose' => $purpose,
+                'limit' => self::MAX_API_REQUESTS_PER_PAGE,
+            ]);
+
+            return false;
+        }
+
+        ++$this->apiRequestsThisPage;
+
+        return true;
     }
 
     private function storeQuote(Stock $stock, QuoteDto $quote, \DateTimeImmutable $now): void

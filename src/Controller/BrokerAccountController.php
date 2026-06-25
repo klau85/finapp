@@ -6,7 +6,6 @@ namespace App\Controller;
 
 use App\Entity\BrokerAccount;
 use App\Entity\User;
-use App\Exception\InsufficientSharesForSellException;
 use App\Form\BrokerAccountType;
 use App\Repository\BrokerAccountRepository;
 use App\Service\PortfolioAnalyticsService;
@@ -73,11 +72,10 @@ class BrokerAccountController extends AbstractController
         $entityManager->remove($brokerAccount);
         $entityManager->flush();
 
-        try {
-            $portfolioAnalytics->recalculateForUser($user);
-            $this->addFlash('success', sprintf('Deleted %s and its associated transactions.', $displayName));
-        } catch (InsufficientSharesForSellException $exception) {
-            $this->addFlash('warning', sprintf('Deleted %s, but portfolio analytics need attention: %s', $displayName, $exception->getMessage()));
+        $analyticsWarnings = $portfolioAnalytics->recalculateForUser($user);
+        $this->addFlash('success', sprintf('Deleted %s and its associated transactions.', $displayName));
+        foreach ($analyticsWarnings as $warning) {
+            $this->addFlash('warning', sprintf('Some portfolio analytics need attention: %s', $warning));
         }
 
         return $this->redirectToRoute('app_broker_accounts');

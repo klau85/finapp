@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Exception\InsufficientSharesForSellException;
 use App\Repository\BrokerAccountRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
@@ -94,11 +93,10 @@ class TransactionController extends AbstractController
         $entityManager->remove($transaction);
         $entityManager->flush();
 
-        try {
-            $portfolioAnalytics->recalculateForUser($user);
-            $this->addFlash('success', 'Transaction deleted.');
-        } catch (InsufficientSharesForSellException $exception) {
-            $this->addFlash('warning', sprintf('Transaction deleted, but portfolio analytics need attention: %s', $exception->getMessage()));
+        $analyticsWarnings = $portfolioAnalytics->recalculateForUser($user);
+        $this->addFlash('success', 'Transaction deleted.');
+        foreach ($analyticsWarnings as $warning) {
+            $this->addFlash('warning', sprintf('Some portfolio analytics need attention: %s', $warning));
         }
 
         return $this->redirectToRoute('app_transactions');

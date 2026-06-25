@@ -24,7 +24,10 @@ final readonly class PortfolioAnalyticsService
     ) {
     }
 
-    public function recalculateForUser(User $user): void
+    /**
+     * @return list<string> FIFO warning messages for broker-account/stock groups that could not be calculated.
+     */
+    public function recalculateForUser(User $user): array
     {
         $connection = $this->entityManager->getConnection();
         $connection->beginTransaction();
@@ -34,9 +37,8 @@ final readonly class PortfolioAnalyticsService
             $this->positionLotRepository->deleteForUser($user);
             $this->entityManager->flush();
 
-            /** @var array<string, list<PositionLot>> $openLots */
-            $openLots = [];
-
+            /** @var array<string, list<Transaction>> $transactionGroups */
+            $transactionGroups = [];
             foreach ($this->transactionRepository->findForFifoRecalculation($user) as $transaction) {
                 $brokerAccount = $transaction->getBrokerAccount();
                 $stock = $transaction->getStock();
@@ -44,31 +46,31 @@ final readonly class PortfolioAnalyticsService
                     continue;
                 }
 
-                $key = $this->fifoKey($transaction);
+                $transactionGroups[$this->fifoKey($transaction)][] = $transaction;
+            }
 
-                if ($transaction->getType() === 'BUY') {
-                    $lot = (new PositionLot())
-                        ->setUser($user)
-                        ->setBrokerAccount($brokerAccount)
-                        ->setStock($stock)
-                        ->setBuyTransaction($transaction)
-                        ->setQuantityOriginal($transaction->getQuantity())
-                        ->setQuantityRemaining($transaction->getQuantity())
-                        ->setPrice($transaction->getPrice())
-                        ->setFeesAllocated($transaction->getFees())
-                        ->setOpenedAt($transaction->getTransactionDate());
-
-                    $this->entityManager->persist($lot);
-                    $openLots[$key][] = $lot;
-
+            $warnings = [];
+            foreach ($transactionGroups as $transactions) {
+                try {
+                    [$lots, $realizedTrades] = $this->calculateFifoGroup($user, $transactions);
+                } catch (InsufficientSharesForSellException $exception) {
+                    $warnings[] = $exception->getMessage();
                     continue;
                 }
 
-                $this->processSell($user, $transaction, $openLots[$key] ?? []);
+                foreach ($lots as $lot) {
+                    $this->entityManager->persist($lot);
+                }
+
+                foreach ($realizedTrades as $realizedTrade) {
+                    $this->entityManager->persist($realizedTrade);
+                }
             }
 
             $this->entityManager->flush();
             $connection->commit();
+
+            return $warnings;
         } catch (\Throwable $exception) {
             if ($connection->isTransactionActive()) {
                 $connection->rollBack();
@@ -310,9 +312,47 @@ final readonly class PortfolioAnalyticsService
     }
 
     /**
-     * @param list<PositionLot> $lots
+     * @param list<Transaction> $transactions
+     * @return array{0: list<PositionLot>, 1: list<RealizedTrade>}
      */
-    private function processSell(User $user, Transaction $sellTransaction, array $lots): void
+    private function calculateFifoGroup(User $user, array $transactions): array
+    {
+        $lots = [];
+        $realizedTrades = [];
+
+        foreach ($transactions as $transaction) {
+            $brokerAccount = $transaction->getBrokerAccount();
+            $stock = $transaction->getStock();
+            if ($brokerAccount === null || $stock === null) {
+                continue;
+            }
+
+            if ($transaction->getType() === 'BUY') {
+                $lots[] = (new PositionLot())
+                    ->setUser($user)
+                    ->setBrokerAccount($brokerAccount)
+                    ->setStock($stock)
+                    ->setBuyTransaction($transaction)
+                    ->setQuantityOriginal($transaction->getQuantity())
+                    ->setQuantityRemaining($transaction->getQuantity())
+                    ->setPrice($transaction->getPrice())
+                    ->setFeesAllocated($transaction->getFees())
+                    ->setOpenedAt($transaction->getTransactionDate());
+
+                continue;
+            }
+
+            $this->processSell($user, $transaction, $lots, $realizedTrades);
+        }
+
+        return [$lots, $realizedTrades];
+    }
+
+    /**
+     * @param list<PositionLot> $lots
+     * @param list<RealizedTrade> $realizedTrades
+     */
+    private function processSell(User $user, Transaction $sellTransaction, array &$lots, array &$realizedTrades): void
     {
         $brokerAccount = $sellTransaction->getBrokerAccount();
         $stock = $sellTransaction->getStock();
@@ -340,7 +380,7 @@ final readonly class PortfolioAnalyticsService
                 continue;
             }
 
-            $this->entityManager->persist($this->createRealizedTrade($user, $buyTransaction, $sellTransaction, $matchedQuantity));
+            $realizedTrades[] = $this->createRealizedTrade($user, $buyTransaction, $sellTransaction, $matchedQuantity);
 
             $lot->setQuantityRemaining(DecimalMath::sub($lot->getQuantityRemaining(), $matchedQuantity));
             $remainingSellQuantity = DecimalMath::sub($remainingSellQuantity, $matchedQuantity);
@@ -348,8 +388,7 @@ final readonly class PortfolioAnalyticsService
 
         if (DecimalMath::cmp($remainingSellQuantity, DecimalMath::zero()) > 0) {
             throw new InsufficientSharesForSellException(sprintf(
-                'SELL transaction #%d exceeds available shares for %s in %s by %s shares.',
-                $sellTransaction->getId() ?? 0,
+                '%s could not be calculated because sells exceed buys in %s by %s shares.',
                 $stock->getSymbol(),
                 $brokerAccount->getDisplayName(),
                 $remainingSellQuantity

@@ -25,6 +25,8 @@ use Scheb\YahooFinanceApi\Results\HistoricalData;
 use Scheb\YahooFinanceApi\Results\Quote;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 #[AllowMockObjectsWithoutExpectations]
 final class MarketDataManagerTest extends TestCase
@@ -263,12 +265,42 @@ final class MarketDataManagerTest extends TestCase
         self::assertSame('mock', $quote->provider);
     }
 
+    public function testWebRequestLimitsRealProviderApiCallsToFive(): void
+    {
+        $quoteRepository = $this->createMock(StockQuoteRepository::class);
+        $quoteRepository->method('findLatestForStock')->willReturn(null);
+
+        $apiClient = $this->createMock(ApiClient::class);
+        $apiClient->expects($this->exactly(5))
+            ->method('getQuote')
+            ->willReturn(new Quote([
+                'symbol' => 'NVDA',
+                'currency' => 'USD',
+                'regularMarketPrice' => 148.5,
+            ]));
+
+        $manager = $this->manager(
+            $quoteRepository,
+            apiClient: $apiClient,
+            requestStack: $this->requestStackWithRequest(),
+        );
+
+        for ($i = 1; $i <= 5; ++$i) {
+            $quote = $manager->getCurrentQuote((new Stock())->setSymbol('STOCK'.$i)->setCurrency('USD'));
+            self::assertSame('148.50000000', $quote->price);
+        }
+
+        $this->expectException(MarketDataUnavailableException::class);
+        $manager->getCurrentQuote((new Stock())->setSymbol('STOCK6')->setCurrency('USD'));
+    }
+
     private function manager(
         ?StockQuoteRepository $quoteRepository = null,
         ?StockPriceRepository $priceRepository = null,
         ?EntityManagerInterface $entityManager = null,
         ?MockHttpClient $twelveDataClient = null,
         ?ApiClient $apiClient = null,
+        ?RequestStack $requestStack = null,
         string $environment = 'test',
         bool $allowMock = false,
     ): MarketDataManager {
@@ -284,6 +316,7 @@ final class MarketDataManagerTest extends TestCase
             new YahooProvider($apiClient ?? $this->apiClient()),
             new MockMarketDataProvider(new MockPriceService()),
             new NullLogger(),
+            $requestStack ?? new RequestStack(),
             $environment,
             $allowMock,
         );
@@ -336,5 +369,13 @@ final class MarketDataManagerTest extends TestCase
     private function twelveDataClient(string $body): MockHttpClient
     {
         return new MockHttpClient([new MockResponse($body)]);
+    }
+
+    private function requestStackWithRequest(): RequestStack
+    {
+        $requestStack = new RequestStack();
+        $requestStack->push(Request::create('/portfolio'));
+
+        return $requestStack;
     }
 }
