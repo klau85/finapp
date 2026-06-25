@@ -256,7 +256,13 @@
             const eventStrip = document.getElementById('chart-transaction-events');
             const candles = {{ candles|json_encode|raw }};
             const markers = {{ markers|json_encode|raw }};
-            const chartMarkers = markers.map(({ time, position, color, shape, text }) => ({ time, position, color, shape, text }));
+            const markerTimesById = new Map();
+            const chartMarkers = markers.map(({ time, position, color, shape, text }, index) => {
+                const id = `transaction-marker-${index}`;
+                markerTimesById.set(id, time);
+
+                return { id, time, position, color, shape, text };
+            });
 
             if (!container || !window.LightweightCharts || candles.length === 0) {
                 return;
@@ -298,7 +304,16 @@
             }
 
             const eventButtons = eventStrip ? Array.from(eventStrip.querySelectorAll('[data-event-time]')) : [];
-            const setActiveEvent = (time) => {
+            const formatChartTime = (time) => {
+                if (!time) {
+                    return null;
+                }
+
+                return typeof time === 'string'
+                    ? time
+                    : `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
+            };
+            const setActiveEvent = (time, focusCard = false) => {
                 let active = null;
                 eventButtons.forEach((button) => {
                     const selected = button.dataset.eventTime === time;
@@ -310,6 +325,9 @@
 
                 if (active !== null) {
                     active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                    if (focusCard) {
+                        active.focus({ preventScroll: true });
+                    }
                 }
             };
 
@@ -320,14 +338,22 @@
             });
 
             chart.subscribeCrosshairMove((param) => {
-                if (!param.time) {
+                const markerTime = markerTimesById.get(String(param.hoveredObjectId ?? ''));
+                container.style.cursor = markerTime ? 'pointer' : '';
+            });
+
+            chart.subscribeClick((param) => {
+                const markerTime = markerTimesById.get(String(param.hoveredObjectId ?? ''));
+                if (markerTime) {
+                    setActiveEvent(markerTime, true);
+
                     return;
                 }
 
-                const time = typeof param.time === 'string'
-                    ? param.time
-                    : `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`;
-                setActiveEvent(time);
+                const clickedTime = formatChartTime(param.time);
+                if (clickedTime !== null && eventButtons.some((button) => button.dataset.eventTime === clickedTime)) {
+                    setActiveEvent(clickedTime, true);
+                }
             });
 
             chart.timeScale().fitContent();
