@@ -56,10 +56,37 @@
 {% block main %}
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div>
-            <div class="page-kicker">Aggregated across broker accounts</div>
+            <div class="page-kicker">{{ selectedBrokerAccount ? 'Filtered by broker account' : 'Aggregated across broker accounts' }}</div>
             <h1 class="h2 mb-0">Portfolio</h1>
+            {% if selectedBrokerAccount %}
+                <div class="text-secondary mt-1">{{ selectedBrokerAccount.displayName }}</div>
+            {% endif %}
         </div>
         <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload transactions</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{{ path('app_portfolio') }}" class="row g-3 align-items-end">
+                <div class="col-md-5 col-lg-4">
+                    <label for="bid" class="form-label">Broker account</label>
+                    <select id="bid" name="bid" class="form-select">
+                        <option value="">All broker accounts</option>
+                        {% for account in brokerAccounts %}
+                            <option value="{{ account.id }}" {{ selectedBrokerAccountId == account.id ? 'selected' }}>
+                                {{ account.displayName }} · {{ account.brokerTypeLabel }} · {{ account.currency }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-auto">
+                    <button class="btn btn-dark" type="submit">Apply</button>
+                    {% if selectedBrokerAccount %}
+                        <a class="btn btn-outline-secondary ms-2" href="{{ path('app_portfolio') }}">Clear</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="row g-3 mb-4">
@@ -125,7 +152,7 @@
         <div class="card-body">
             <div class="mb-3">
                 <h2 class="h5 mb-1">Exposure</h2>
-                <div class="text-secondary">Based on current market value by stock.</div>
+                <div class="text-secondary">Based on current market value by stock{{ selectedBrokerAccount ? ' in ' ~ selectedBrokerAccount.displayName : '' }}.</div>
             </div>
             {% if exposure %}
                 <div class="row g-4 align-items-center">

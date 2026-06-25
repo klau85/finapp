@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Exception\MarketDataUnavailableException;
 use App\MarketData\MarketDataManager;
 use App\MarketData\StockChartMarkerFactory;
+use App\Repository\BrokerAccountRepository;
 use App\Repository\RealizedTradeRepository;
 use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
@@ -28,17 +29,31 @@ class PortfolioController extends AbstractController
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
+        BrokerAccountRepository $brokerAccountRepository,
     ): Response {
         $user = $this->getUser();
         \assert($user instanceof User);
 
-        $positionsWithoutPrices = $portfolioAnalytics->getOpenPositionSummaries($user);
+        $brokerAccounts = $brokerAccountRepository->findForUser($user);
+        $selectedBrokerAccount = null;
+        $brokerAccountIdValue = $request->query->get('bid');
+        $selectedBrokerAccountId = is_scalar($brokerAccountIdValue) && trim((string) $brokerAccountIdValue) !== ''
+            ? (int) $brokerAccountIdValue
+            : 0;
+        if ($selectedBrokerAccountId > 0) {
+            $selectedBrokerAccount = $brokerAccountRepository->findOneForUser($user, $selectedBrokerAccountId);
+            if ($selectedBrokerAccount === null) {
+                throw $this->createNotFoundException('Broker account not found.');
+            }
+        }
+
+        $positionsWithoutPrices = $portfolioAnalytics->getOpenPositionSummaries($user, brokerAccount: $selectedBrokerAccount);
         [$currentPrices, $unavailableSymbols] = $this->loadCurrentPrices(
             array_map(static fn (array $position): string => $position['symbol'], $positionsWithoutPrices),
             $stockRepository,
             $marketDataManager,
         );
-        $positions = $portfolioAnalytics->getAggregatedPortfolio($user, $currentPrices);
+        $positions = $portfolioAnalytics->getAggregatedPortfolio($user, $currentPrices, $selectedBrokerAccount);
         $positions = $this->markMarketAvailability($positions, $unavailableSymbols);
         $marketDataAvailable = $unavailableSymbols === [];
         $positionsWithMarketData = array_values(array_filter(
@@ -57,8 +72,15 @@ class PortfolioController extends AbstractController
         );
         $queryParams = $request->query->all();
         unset($queryParams['page']);
+        unset($queryParams['brokerAccountId']);
+        if (($queryParams['bid'] ?? null) === '') {
+            unset($queryParams['bid']);
+        }
 
         return $this->render('portfolio/index.html.twig', [
+            'brokerAccounts' => $brokerAccounts,
+            'selectedBrokerAccount' => $selectedBrokerAccount,
+            'selectedBrokerAccountId' => $selectedBrokerAccount?->getId(),
             'positions' => $paginatedPositions,
             'marketDataAvailable' => $marketDataAvailable,
             'partialMarketData' => !$marketDataAvailable && $hasPricedPositions,

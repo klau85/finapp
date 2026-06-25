@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\BrokerAccount;
 use App\Entity\RealizedTrade;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -57,15 +58,21 @@ class RealizedTradeRepository extends ServiceEntityRepository
     /**
      * @return array<string, string>
      */
-    public function getRealizedGainByStockForUser(User $user): array
+    public function getRealizedGainByStockForUser(User $user, ?BrokerAccount $brokerAccount = null): array
     {
-        $rows = $this->createQueryBuilder('realizedTrade')
+        $queryBuilder = $this->createQueryBuilder('realizedTrade')
             ->select('IDENTITY(realizedTrade.stock) AS stock_id, COALESCE(SUM(realizedTrade.profit), 0) AS profit')
             ->andWhere('realizedTrade.user = :user')
             ->setParameter('user', $user)
-            ->groupBy('realizedTrade.stock')
-            ->getQuery()
-            ->getArrayResult();
+            ->groupBy('realizedTrade.stock');
+
+        if ($brokerAccount !== null) {
+            $queryBuilder
+                ->andWhere('realizedTrade.brokerAccount = :brokerAccount')
+                ->setParameter('brokerAccount', $brokerAccount);
+        }
+
+        $rows = $queryBuilder->getQuery()->getArrayResult();
 
         $indexed = [];
         foreach ($rows as $row) {
@@ -78,16 +85,22 @@ class RealizedTradeRepository extends ServiceEntityRepository
     /**
      * @return array<string, string>
      */
-    public function getRealizedGainByBrokerAccountAndStockForUser(User $user): array
+    public function getRealizedGainByBrokerAccountAndStockForUser(User $user, ?BrokerAccount $brokerAccount = null): array
     {
-        $rows = $this->createQueryBuilder('realizedTrade')
+        $queryBuilder = $this->createQueryBuilder('realizedTrade')
             ->select('IDENTITY(realizedTrade.brokerAccount) AS broker_account_id, IDENTITY(realizedTrade.stock) AS stock_id, COALESCE(SUM(realizedTrade.profit), 0) AS profit')
             ->andWhere('realizedTrade.user = :user')
             ->setParameter('user', $user)
             ->groupBy('realizedTrade.brokerAccount')
-            ->addGroupBy('realizedTrade.stock')
-            ->getQuery()
-            ->getArrayResult();
+            ->addGroupBy('realizedTrade.stock');
+
+        if ($brokerAccount !== null) {
+            $queryBuilder
+                ->andWhere('realizedTrade.brokerAccount = :brokerAccount')
+                ->setParameter('brokerAccount', $brokerAccount);
+        }
+
+        $rows = $queryBuilder->getQuery()->getArrayResult();
 
         $indexed = [];
         foreach ($rows as $row) {

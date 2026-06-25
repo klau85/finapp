@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\BrokerAccount;
 use App\Entity\PositionLot;
 use App\Entity\RealizedTrade;
 use App\Entity\Transaction;
@@ -154,13 +155,13 @@ final readonly class PortfolioAnalyticsService
      *     }>
      * }>
      */
-    public function getAggregatedPortfolio(User $user, array $currentPrices = []): array
+    public function getAggregatedPortfolio(User $user, array $currentPrices = [], ?BrokerAccount $brokerAccount = null): array
     {
-        $realizedByStock = $this->realizedTradeRepository->getRealizedGainByStockForUser($user);
-        $realizedByAccountStock = $this->realizedTradeRepository->getRealizedGainByBrokerAccountAndStockForUser($user);
+        $realizedByStock = $this->realizedTradeRepository->getRealizedGainByStockForUser($user, $brokerAccount);
+        $realizedByAccountStock = $this->realizedTradeRepository->getRealizedGainByBrokerAccountAndStockForUser($user, $brokerAccount);
         $byStock = [];
 
-        foreach ($this->getOpenPositionSummaries($user, $currentPrices) as $position) {
+        foreach ($this->getOpenPositionSummaries($user, $currentPrices, $brokerAccount) as $position) {
             $stockId = (string) ($position['stockId'] ?? 0);
             $accountStockKey = ($position['brokerAccountId'] ?? 0).':'.$stockId;
             $realizedGain = DecimalMath::normalize($realizedByAccountStock[$accountStockKey] ?? DecimalMath::zero());
@@ -244,11 +245,11 @@ final readonly class PortfolioAnalyticsService
      *     unrealizedGain: string
      * }>
      */
-    public function getOpenPositionSummaries(User $user, array $currentPrices = []): array
+    public function getOpenPositionSummaries(User $user, array $currentPrices = [], ?BrokerAccount $brokerAccount = null): array
     {
         $positions = [];
 
-        foreach ($this->positionLotRepository->findOpenForUser($user) as $lot) {
+        foreach ($this->positionLotRepository->findOpenForUser($user, $brokerAccount) as $lot) {
             $brokerAccount = $lot->getBrokerAccount();
             $stock = $lot->getStock();
             $buyTransaction = $lot->getBuyTransaction();

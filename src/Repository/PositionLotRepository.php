@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\BrokerAccount;
 use App\Entity\PositionLot;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -30,9 +31,9 @@ class PositionLotRepository extends ServiceEntityRepository
     /**
      * @return list<PositionLot>
      */
-    public function findOpenForUser(User $user): array
+    public function findOpenForUser(User $user, ?BrokerAccount $brokerAccount = null): array
     {
-        return $this->createQueryBuilder('positionLot')
+        $queryBuilder = $this->createQueryBuilder('positionLot')
             ->addSelect('brokerAccount', 'stock', 'buyTransaction')
             ->join('positionLot.brokerAccount', 'brokerAccount')
             ->join('positionLot.stock', 'stock')
@@ -42,9 +43,15 @@ class PositionLotRepository extends ServiceEntityRepository
             ->setParameter('user', $user)
             ->orderBy('brokerAccount.displayName', 'ASC')
             ->addOrderBy('stock.symbol', 'ASC')
-            ->addOrderBy('positionLot.openedAt', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->addOrderBy('positionLot.openedAt', 'ASC');
+
+        if ($brokerAccount !== null) {
+            $queryBuilder
+                ->andWhere('positionLot.brokerAccount = :brokerAccount')
+                ->setParameter('brokerAccount', $brokerAccount);
+        }
+
+        return $queryBuilder->getQuery()->getResult();
     }
 
     /**
