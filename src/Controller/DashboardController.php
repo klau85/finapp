@@ -149,17 +149,42 @@ class DashboardController extends AbstractController
                 continue;
             }
 
-            $verb = $transaction->getType() === 'BUY' ? 'bought' : 'sold';
-            $activities[] = [
-                'sentence' => sprintf(
-                    'You %s %s %s @ %s in %s on %s.',
-                    $verb,
+            $sentence = match ($transaction->getType()) {
+                'BUY' => sprintf(
+                    'You bought %s %s @ %s in %s on %s.',
                     $formatter->trimNumber($transaction->getQuantity()),
                     $stock->getSymbol(),
                     $formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()),
                     $brokerAccount->getDisplayName(),
-                    $transaction->getTransactionDate()->format('Y-m-d')
+                    $transaction->getTransactionDate()->format('Y-m-d'),
                 ),
+                'SELL' => sprintf(
+                    'You sold %s %s @ %s in %s on %s.',
+                    $formatter->trimNumber($transaction->getQuantity()),
+                    $stock->getSymbol(),
+                    $formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()),
+                    $brokerAccount->getDisplayName(),
+                    $transaction->getTransactionDate()->format('Y-m-d'),
+                ),
+                'STOCK_SPLIT' => sprintf(
+                    'A stock split adjusted %s %s in %s on %s.',
+                    $formatter->trimNumber($transaction->getQuantity()),
+                    $stock->getSymbol(),
+                    $brokerAccount->getDisplayName(),
+                    $transaction->getTransactionDate()->format('Y-m-d'),
+                ),
+                default => sprintf(
+                    '%s %s %s in %s on %s.',
+                    str_replace('_', ' ', $transaction->getType()),
+                    $formatter->trimNumber($transaction->getQuantity()),
+                    $stock->getSymbol(),
+                    $brokerAccount->getDisplayName(),
+                    $transaction->getTransactionDate()->format('Y-m-d'),
+                ),
+            };
+
+            $activities[] = [
+                'sentence' => $sentence,
                 'date' => $transaction->getTransactionDate()->format('Y-m-d'),
                 'type' => $transaction->getType(),
                 'currency' => $transaction->getCurrency(),

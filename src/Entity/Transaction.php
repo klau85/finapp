@@ -17,7 +17,10 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['type'], name: 'idx_transaction_type')]
 class Transaction
 {
-    public const TYPES = ['BUY', 'SELL'];
+    public const TYPE_BUY = 'BUY';
+    public const TYPE_SELL = 'SELL';
+    public const TYPE_STOCK_SPLIT = 'STOCK_SPLIT';
+    public const TYPES = [self::TYPE_BUY, self::TYPE_SELL, self::TYPE_STOCK_SPLIT];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -43,7 +46,7 @@ class Transaction
     #[ORM\Column]
     private \DateTimeImmutable $transactionDate;
 
-    #[ORM\Column(length: 4)]
+    #[ORM\Column(length: 32)]
     private string $type = 'BUY';
 
     #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]

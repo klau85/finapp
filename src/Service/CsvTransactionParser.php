@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\BrokerAccount;
+use App\Entity\Transaction;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 final class CsvTransactionParser
@@ -357,13 +358,14 @@ final class CsvTransactionParser
         $errors = [];
 
         $type = match (strtoupper($data['type'])) {
-            'BUY - MARKET' => 'BUY',
-            'SELL - MARKET' => 'SELL',
+            'BUY - MARKET' => Transaction::TYPE_BUY,
+            'SELL - MARKET' => Transaction::TYPE_SELL,
+            'STOCK SPLIT' => Transaction::TYPE_STOCK_SPLIT,
             default => null,
         };
 
         if ($type === null) {
-            $errors[] = 'type must be BUY - MARKET or SELL - MARKET.';
+            $errors[] = 'type must be BUY - MARKET, SELL - MARKET, or STOCK SPLIT.';
         }
 
         $date = $this->parseRevolutDate($data['date']);
@@ -376,14 +378,20 @@ final class CsvTransactionParser
             $errors[] = 'ticker is required.';
         }
 
-        $quantity = $this->isDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'];
-        if (!$this->isDecimal($data['quantity']) || DecimalMath::cmp($data['quantity'], '0.00000000') <= 0) {
+        $quantity = $this->isSignedDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'];
+        if ($type === Transaction::TYPE_STOCK_SPLIT) {
+            if (!$this->isSignedDecimal($data['quantity']) || DecimalMath::cmp($quantity, DecimalMath::zero()) === 0) {
+                $errors[] = 'quantity must be a non-zero decimal for stock splits.';
+            }
+        } elseif (!$this->isDecimal($data['quantity']) || DecimalMath::cmp($data['quantity'], '0.00000000') <= 0) {
             $errors[] = 'quantity must be a positive decimal.';
         }
 
         $price = '';
         $priceCurrency = '';
-        if (preg_match('/^([A-Z]{3})\s+(\d+(?:\.\d+)?)$/i', $data['price per share'], $matches) === 1) {
+        if ($type === Transaction::TYPE_STOCK_SPLIT && $data['price per share'] === '') {
+            $price = DecimalMath::zero();
+        } elseif (preg_match('/^([A-Z]{3})\s+(\d+(?:\.\d+)?)$/i', $data['price per share'], $matches) === 1) {
             $priceCurrency = strtoupper($matches[1]);
             $price = DecimalMath::normalize($matches[2]);
 
@@ -481,6 +489,11 @@ final class CsvTransactionParser
     private function isDecimal(string $value): bool
     {
         return preg_match('/^\d+(?:\.\d+)?$/', trim($value)) === 1;
+    }
+
+    private function isSignedDecimal(string $value): bool
+    {
+        return preg_match('/^-?\d+(?:\.\d+)?$/', trim($value)) === 1;
     }
 
     private function normalizeAbsoluteDecimal(string $value): ?string

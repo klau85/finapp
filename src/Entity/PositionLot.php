@@ -109,6 +109,11 @@ class PositionLot
         return $this->quantityRemaining;
     }
 
+    public function getQuantityOriginal(): string
+    {
+        return $this->quantityOriginal;
+    }
+
     public function getPrice(): string
     {
         return $this->price;

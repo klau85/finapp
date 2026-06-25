@@ -100,7 +100,8 @@ final readonly class StockChartMarkerFactory
     private function marker(string $time, string $type, array $details): array
     {
         $buy = $type === 'BUY';
-        $label = $buy ? 'B' : 'S';
+        $split = $type === 'STOCK_SPLIT';
+        $label = $split ? 'SP' : ($buy ? 'B' : 'S');
         if (count($details) > 1) {
             $label .= (string) count($details);
         }
@@ -108,8 +109,8 @@ final readonly class StockChartMarkerFactory
         return [
             'time' => $time,
             'position' => $buy ? 'belowBar' : 'aboveBar',
-            'color' => $buy ? '#16a34a' : '#dc2626',
-            'shape' => $buy ? 'arrowUp' : 'arrowDown',
+            'color' => $split ? '#6b7280' : ($buy ? '#16a34a' : '#dc2626'),
+            'shape' => $split ? 'circle' : ($buy ? 'arrowUp' : 'arrowDown'),
             'text' => $label,
             'type' => $type,
             'details' => $details,
@@ -121,10 +122,10 @@ final readonly class StockChartMarkerFactory
         $brokerAccount = $transaction->getBrokerAccount();
 
         return sprintf(
-            '%s %s @ %s%s',
-            $transaction->getType(),
+            '%s %s%s%s',
+            str_replace('_', ' ', $transaction->getType()),
             $this->formatter->trimNumber($transaction->getQuantity()),
-            $this->formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()),
+            $transaction->getType() !== 'STOCK_SPLIT' ? ' @ '.$this->formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()) : '',
             $brokerAccount !== null ? ' - '.$brokerAccount->getDisplayName() : '',
         );
     }

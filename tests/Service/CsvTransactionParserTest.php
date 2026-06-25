@@ -199,7 +199,7 @@ CSV), $account);
 
         self::assertCount(4, $rows);
         self::assertFalse($rows[0]->isValid());
-        self::assertContains('type must be BUY - MARKET or SELL - MARKET.', $rows[0]->errors);
+        self::assertContains('type must be BUY - MARKET, SELL - MARKET, or STOCK SPLIT.', $rows[0]->errors);
 
         self::assertFalse($rows[1]->isValid());
         self::assertContains('ticker is required.', $rows[1]->errors);
@@ -209,6 +209,31 @@ CSV), $account);
 
         self::assertFalse($rows[3]->isValid());
         self::assertContains('currency must be USD.', $rows[3]->errors);
+    }
+
+    public function testRevolutCsvMapsStockSplitRowsToCorporateActionTransactions(): void
+    {
+        $account = (new BrokerAccount())
+            ->setBrokerType('revolut')
+            ->setCurrency('USD');
+
+        $rows = (new CsvTransactionParser())->parse($this->uploadedFile(<<<'CSV'
+Date,Ticker,Type,Quantity,Price per share,Total Amount,Currency,FX Rate
+2024-06-17T07:44:52.740377Z,SPCE,STOCK SPLIT,-5.70525065,,USD 0,USD,0.2156
+CSV), $account);
+
+        self::assertCount(1, $rows);
+        self::assertTrue($rows[0]->isValid());
+        self::assertSame([
+            'date' => '2024-06-17',
+            'transactionDate' => '2024-06-17 07:44:52',
+            'symbol' => 'SPCE',
+            'type' => 'STOCK_SPLIT',
+            'quantity' => '-5.70525065',
+            'price' => '0.00000000',
+            'currency' => 'USD',
+            'fees' => '0.00000000',
+        ], $rows[0]->data);
     }
 
     private function uploadedFile(string $contents): UploadedFile

@@ -170,10 +170,19 @@
                                         <td>USD 151.20</td>
                                         <td>USD</td>
                                     </tr>
+                                    <tr>
+                                        <td>2024-06-17T07:44:52.740377Z</td>
+                                        <td>SPCE</td>
+                                        <td>STOCK SPLIT</td>
+                                        <td>-5.70525065</td>
+                                        <td></td>
+                                        <td>USD</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-secondary mb-0">Revolut imports support BUY - MARKET and SELL - MARKET rows only.<br>
+                        <p class="text-secondary mb-0">Revolut imports support BUY - MARKET, SELL - MARKET, and STOCK SPLIT rows.<br>
+                            Stock split rows adjust open FIFO lots and preserve the current cost basis.<br>
                             Rows with empty tickers, non-USD prices, or non-USD currency are marked invalid and skipped.
                         </p>
                     </div>

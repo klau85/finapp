@@ -100,8 +100,10 @@
                                     <td>
                                         {% if transaction.type == 'BUY' %}
                                             <span class="badge badge-buy">BUY</span>
-                                        {% else %}
+                                        {% elseif transaction.type == 'SELL' %}
                                             <span class="badge badge-sell">SELL</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">{{ transaction.type|replace({'_': ' '}) }}</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end">{{ transaction.quantity|trim_number }}</td>

@@ -97,7 +97,7 @@
                             <div class="vstack gap-3">
                                 {% for activity in recentActivities %}
                                     <div class="border-bottom pb-3">
-                                        <span class="badge {{ activity.type == 'BUY' ? 'badge-buy' : 'badge-sell' }} me-2">{{ activity.type }}</span>
+                                        <span class="badge {{ activity.type == 'BUY' ? 'badge-buy' : (activity.type == 'SELL' ? 'badge-sell' : 'text-bg-secondary') }} me-2">{{ activity.type|replace({'_': ' '}) }}</span>
                                         <span>{{ activity.sentence }}</span>
                                     </div>
                                 {% endfor %}

@@ -76,6 +76,8 @@
                                         <span class="badge badge-buy">BUY</span>
                                     {% elseif (data.type ?? '') == 'SELL' %}
                                         <span class="badge badge-sell">SELL</span>
+                                    {% elseif (data.type ?? '') == 'STOCK_SPLIT' %}
+                                        <span class="badge text-bg-secondary">STOCK SPLIT</span>
                                     {% else %}
                                         {{ data.type ?? '-' }}
                                     {% endif %}

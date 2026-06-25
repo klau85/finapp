@@ -327,7 +327,7 @@ final readonly class PortfolioAnalyticsService
                 continue;
             }
 
-            if ($transaction->getType() === 'BUY') {
+            if ($transaction->getType() === Transaction::TYPE_BUY) {
                 $lots[] = (new PositionLot())
                     ->setUser($user)
                     ->setBrokerAccount($brokerAccount)
@@ -342,10 +342,70 @@ final readonly class PortfolioAnalyticsService
                 continue;
             }
 
+            if ($transaction->getType() === Transaction::TYPE_STOCK_SPLIT) {
+                $this->processStockSplit($transaction, $lots);
+
+                continue;
+            }
+
             $this->processSell($user, $transaction, $lots, $realizedTrades);
         }
 
         return [$lots, $realizedTrades];
+    }
+
+    /**
+     * @param list<PositionLot> $lots
+     */
+    private function processStockSplit(Transaction $stockSplitTransaction, array &$lots): void
+    {
+        $brokerAccount = $stockSplitTransaction->getBrokerAccount();
+        $stock = $stockSplitTransaction->getStock();
+        if ($brokerAccount === null || $stock === null) {
+            return;
+        }
+
+        $currentShares = DecimalMath::zero();
+        foreach ($lots as $lot) {
+            if (DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0) {
+                $currentShares = DecimalMath::add($currentShares, $lot->getQuantityRemaining());
+            }
+        }
+
+        $newShares = DecimalMath::add($currentShares, $stockSplitTransaction->getQuantity());
+        if (DecimalMath::cmp($currentShares, DecimalMath::zero()) <= 0 || DecimalMath::cmp($newShares, DecimalMath::zero()) <= 0) {
+            throw new InsufficientSharesForSellException(sprintf(
+                '%s stock split could not be calculated in %s because the resulting share quantity is invalid.',
+                $stock->getSymbol(),
+                $brokerAccount->getDisplayName(),
+            ));
+        }
+
+        $factor = DecimalMath::div($newShares, $currentShares);
+        $openLotIndexes = array_keys(array_filter(
+            $lots,
+            static fn (PositionLot $lot): bool => DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0,
+        ));
+        $lastOpenLotIndex = $openLotIndexes[array_key_last($openLotIndexes)] ?? null;
+        $adjustedShares = DecimalMath::zero();
+
+        foreach ($lots as $index => $lot) {
+            if (DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
+                continue;
+            }
+
+            $oldRemainingQuantity = $lot->getQuantityRemaining();
+            $oldRemainingCostBasis = DecimalMath::mul($oldRemainingQuantity, $lot->getPrice());
+            $newRemainingQuantity = $index === $lastOpenLotIndex
+                ? DecimalMath::sub($newShares, $adjustedShares)
+                : DecimalMath::mul($oldRemainingQuantity, $factor);
+            $adjustedShares = DecimalMath::add($adjustedShares, $newRemainingQuantity);
+
+            $lot
+                ->setQuantityOriginal(DecimalMath::mul($lot->getQuantityOriginal(), $factor))
+                ->setQuantityRemaining($newRemainingQuantity)
+                ->setPrice(DecimalMath::div($oldRemainingCostBasis, $newRemainingQuantity));
+        }
     }
 
     /**
@@ -380,9 +440,14 @@ final readonly class PortfolioAnalyticsService
                 continue;
             }
 
-            $realizedTrades[] = $this->createRealizedTrade($user, $buyTransaction, $sellTransaction, $matchedQuantity);
+            $buyFeePart = DecimalMath::mul(
+                $lot->getFeesAllocated(),
+                DecimalMath::div($matchedQuantity, $lot->getQuantityRemaining())
+            );
+            $realizedTrades[] = $this->createRealizedTrade($user, $buyTransaction, $sellTransaction, $matchedQuantity, $buyFeePart);
 
             $lot->setQuantityRemaining(DecimalMath::sub($lot->getQuantityRemaining(), $matchedQuantity));
+            $lot->setFeesAllocated(DecimalMath::sub($lot->getFeesAllocated(), $buyFeePart));
             $remainingSellQuantity = DecimalMath::sub($remainingSellQuantity, $matchedQuantity);
         }
 
@@ -401,15 +466,12 @@ final readonly class PortfolioAnalyticsService
         Transaction $buyTransaction,
         Transaction $sellTransaction,
         string $matchedQuantity,
+        string $buyFeePart,
     ): RealizedTrade {
         $brokerAccount = $sellTransaction->getBrokerAccount();
         $stock = $sellTransaction->getStock();
         \assert($brokerAccount !== null && $stock !== null);
 
-        $buyFeePart = DecimalMath::mul(
-            $buyTransaction->getFees(),
-            DecimalMath::div($matchedQuantity, $buyTransaction->getQuantity())
-        );
         $sellFeePart = DecimalMath::mul(
             $sellTransaction->getFees(),
             DecimalMath::div($matchedQuantity, $sellTransaction->getQuantity())

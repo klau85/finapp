@@ -72,7 +72,7 @@
                             <button type="button" class="chart-event-card" data-event-time="{{ marker.time }}">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                                     <span class="small fw-semibold">{{ marker.time }}</span>
-                                    <span class="badge {{ marker.type == 'BUY' ? 'badge-buy' : 'badge-sell' }}">{{ marker.text }}</span>
+                                    <span class="badge {{ marker.type == 'BUY' ? 'badge-buy' : (marker.type == 'SELL' ? 'badge-sell' : 'text-bg-secondary') }}">{{ marker.text }}</span>
                                 </div>
                                 {% for detail in marker.details %}
                                     <div class="chart-event-detail">{{ detail }}</div>
@@ -220,8 +220,10 @@
                                 <td>
                                     {% if transaction.type == 'BUY' %}
                                         <span class="badge badge-buy">BUY</span>
-                                    {% else %}
+                                    {% elseif transaction.type == 'SELL' %}
                                         <span class="badge badge-sell">SELL</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">{{ transaction.type|replace({'_': ' '}) }}</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-end">{{ transaction.quantity|trim_number }}</td>

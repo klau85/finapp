@@ -177,7 +177,6 @@
                         <thead>
                             <tr>
                                 <th>Symbol</th>
-                                <th>Company name</th>
                                 <th class="text-end">Total shares</th>
                                 <th class="text-end">Average cost</th>
                                 <th class="text-end">Current price</th>
@@ -186,7 +185,6 @@
                                 <th class="text-end">Unrealized P/L</th>
                                 <th class="text-end">Total P/L</th>
                                 <th class="text-end">Total P/L %</th>
-                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -195,9 +193,9 @@
                                 <tr>
                                     <td>
                                         <button class="btn btn-sm btn-outline-secondary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#{{ rowId }}" aria-expanded="false" aria-controls="{{ rowId }}">+</button>
-                                        <span class="fw-semibold">{{ position.symbol }}</span>
+                                        <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: position.symbol }) }}"><span class="fw-semibold">{{ position.symbol }}</span></a>
+
                                     </td>
-                                    <td>{{ position.companyName ?: '-' }}</td>
                                     <td class="text-end">{{ position.totalShares|trim_number }}</td>
                                     <td class="text-end">{{ position.averageCost|money_symbol(position.currency) }}</td>
                                     <td class="text-end">{{ position.marketDataAvailable ? position.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
@@ -213,9 +211,6 @@
                                     </td>
                                     <td class="text-end {{ position.marketDataAvailable and position.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">
                                         {{ position.marketDataAvailable ? position.totalGainPercent|trim_number ~ '%' : 'Unavailable' }}
-                                    </td>
-                                    <td class="text-end">
-                                        <a class="btn btn-sm btn-outline-dark" href="{{ path('app_stock_show', { symbol: position.symbol }) }}">Stock page</a>
                                     </td>
                                 </tr>
                                 <tr class="collapse" id="{{ rowId }}">
