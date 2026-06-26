@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Exception\MarketDataUnavailableException;
 use App\MarketData\MarketDataManager;
 use App\Repository\BrokerAccountRepository;
 use App\Repository\PositionLotRepository;
@@ -241,19 +240,26 @@ class DashboardController extends AbstractController
     {
         $prices = [];
         $unavailable = [];
+        $stocks = [];
 
-        foreach ($symbols as $symbol) {
+        foreach (array_unique($symbols) as $symbol) {
             $stock = $stockRepository->findOneBySymbol($symbol);
             if ($stock === null) {
                 $unavailable[] = $symbol;
                 continue;
             }
 
-            try {
-                $prices[$symbol] = $marketDataManager->getCurrentQuote($stock)->price;
-            } catch (MarketDataUnavailableException) {
+            $stocks[$symbol] = $stock;
+        }
+
+        $quotes = $marketDataManager->getCurrentQuotes(array_values($stocks));
+        foreach (array_keys($stocks) as $symbol) {
+            if (!isset($quotes[$symbol])) {
                 $unavailable[] = $symbol;
+                continue;
             }
+
+            $prices[$symbol] = $quotes[$symbol]->price;
         }
 
         return [$prices, $unavailable];

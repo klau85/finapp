@@ -74,6 +74,44 @@ final class MarketDataManagerTest extends TestCase
         self::assertSame('yahoo', $quote->provider);
     }
 
+    public function testBatchQuoteCacheMissFetchesAndStoresYahooQuotesInOneRequest(): void
+    {
+        $stocks = [
+            (new Stock())->setSymbol('NVDA')->setCurrency('USD'),
+            (new Stock())->setSymbol('MSFT')->setCurrency('USD'),
+            (new Stock())->setSymbol('AAPL')->setCurrency('USD'),
+        ];
+        $quoteRepository = $this->createMock(StockQuoteRepository::class);
+        $quoteRepository->expects($this->exactly(3))->method('findLatestForStock')->willReturn(null);
+
+        $apiClient = $this->createMock(ApiClient::class);
+        $apiClient->expects($this->once())
+            ->method('getQuotes')
+            ->with(['NVDA', 'MSFT', 'AAPL'])
+            ->willReturn([
+                new Quote(['symbol' => 'NVDA', 'currency' => 'USD', 'regularMarketPrice' => 148.5]),
+                new Quote(['symbol' => 'MSFT', 'currency' => 'USD', 'regularMarketPrice' => 510.25]),
+                new Quote(['symbol' => 'AAPL', 'currency' => 'USD', 'regularMarketPrice' => 201.75]),
+            ]);
+        $apiClient->expects($this->never())->method('getQuote');
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects($this->exactly(3))->method('persist')->with(self::isInstanceOf(StockQuote::class));
+        $entityManager->expects($this->once())->method('flush');
+
+        $quotes = $this->manager(
+            $quoteRepository,
+            entityManager: $entityManager,
+            apiClient: $apiClient,
+            requestStack: $this->requestStackWithRequest(),
+        )->getCurrentQuotes($stocks);
+
+        self::assertSame(['NVDA', 'MSFT', 'AAPL'], array_keys($quotes));
+        self::assertSame('148.50000000', $quotes['NVDA']->price);
+        self::assertSame('510.25000000', $quotes['MSFT']->price);
+        self::assertSame('201.75000000', $quotes['AAPL']->price);
+    }
+
     public function testQuoteFallsBackToTwelveDataWhenYahooFails(): void
     {
         $stock = $this->stock();
@@ -361,6 +399,7 @@ final class MarketDataManagerTest extends TestCase
     {
         $client = $this->createMock(ApiClient::class);
         $client->method('getQuote')->willReturn($quote);
+        $client->method('getQuotes')->willReturn($quote !== null ? [$quote] : []);
         $client->method('getHistoricalQuoteData')->willReturn($candles);
 
         return $client;

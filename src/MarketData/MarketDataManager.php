@@ -64,10 +64,9 @@ final class MarketDataManager
                 return $quote;
             } catch (MarketDataProviderException $exception) {
                 $providerException = $exception;
-                $this->logger->warning('Market quote provider failed.', [
-                    'symbol' => $stock->getSymbol(),
-                    'provider' => $provider::class,
-                    'provider_error' => $exception->getMessage(),
+                $this->logProviderFailure('quote', $stock, $provider, $exception, [
+                    'cache_available' => $cached !== null,
+                    'cached_fetched_at' => $cached?->getFetchedAt()->format(\DateTimeInterface::ATOM),
                 ]);
             }
         }
@@ -81,6 +80,96 @@ final class MarketDataManager
         }
 
         throw new MarketDataUnavailableException('Market data is unavailable at this moment.', previous: $providerException);
+    }
+
+    /**
+     * @param list<Stock> $stocks
+     * @return array<string, QuoteDto> Quotes keyed by internal stock symbol.
+     */
+    public function getCurrentQuotes(array $stocks): array
+    {
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $freshAfter = $now->modify(sprintf('-%d minutes', $this->currentQuoteTtlMinutes($now)));
+        $quotes = [];
+        $pending = [];
+        $staleCache = [];
+
+        foreach ($this->uniqueStocksBySymbol($stocks) as $symbol => $stock) {
+            $cached = $this->stockQuoteRepository->findLatestForStock($stock);
+            if ($cached !== null && $cached->getFetchedAt() >= $freshAfter) {
+                $quotes[$symbol] = $this->quoteFromEntity($cached);
+                continue;
+            }
+
+            $pending[$symbol] = $stock;
+            if ($cached !== null) {
+                $staleCache[$symbol] = $cached;
+            }
+        }
+
+        if ($pending === []) {
+            return $quotes;
+        }
+
+        $yahooStocks = array_values(array_filter(
+            $pending,
+            fn (Stock $stock): bool => $this->yahooProvider->supports($stock),
+        ));
+
+        if ($yahooStocks !== [] && $this->reserveApiRequest($yahooStocks[0], $this->yahooProvider, 'quote-batch')) {
+            try {
+                $batchQuotes = $this->yahooProvider->getCurrentQuotes($yahooStocks);
+                $this->storeQuotes($this->stocksForQuotes($yahooStocks), $batchQuotes, $now);
+
+                foreach ($batchQuotes as $symbol => $quote) {
+                    $quotes[$symbol] = $quote;
+                    unset($pending[$symbol]);
+                }
+            } catch (MarketDataProviderException $exception) {
+                $this->logProviderFailure('quote-batch', $yahooStocks[0], $this->yahooProvider, $exception, [
+                    'symbols' => array_map(static fn (Stock $stock): string => $stock->getSymbol(), $yahooStocks),
+                    'cache_available' => $staleCache !== [],
+                ]);
+            }
+        }
+
+        foreach ($pending as $symbol => $stock) {
+            $providerException = null;
+            if ($this->twelveDataProvider->supports($stock) && $this->reserveApiRequest($stock, $this->twelveDataProvider, 'quote')) {
+                try {
+                    $quote = $this->twelveDataProvider->getCurrentQuote($stock);
+                    $this->storeQuote($stock, $quote, $now);
+                    $quotes[$symbol] = $quote;
+
+                    continue;
+                } catch (MarketDataProviderException $exception) {
+                    $providerException = $exception;
+                    $this->logProviderFailure('quote', $stock, $this->twelveDataProvider, $exception, [
+                        'cache_available' => isset($staleCache[$symbol]),
+                        'cached_fetched_at' => ($staleCache[$symbol] ?? null)?->getFetchedAt()->format(\DateTimeInterface::ATOM),
+                    ]);
+                }
+            }
+
+            if (isset($staleCache[$symbol])) {
+                $quotes[$symbol] = $this->quoteFromEntity($staleCache[$symbol]);
+                continue;
+            }
+
+            if ($this->canUseMockProvider() && $this->mockProvider->supports($stock)) {
+                $quotes[$symbol] = $this->mockProvider->getCurrentQuote($stock);
+                continue;
+            }
+
+            if ($providerException !== null) {
+                $this->logger->info('Market data quote unavailable for stock after provider fallback.', [
+                    'symbol' => $symbol,
+                    'provider_error' => $providerException->getMessage(),
+                ]);
+            }
+        }
+
+        return $quotes;
     }
 
     /**
@@ -133,10 +222,13 @@ final class MarketDataManager
                 );
             } catch (MarketDataProviderException $exception) {
                 $providerException = $exception;
-                $this->logger->warning('Market OHLC provider failed.', [
-                    'symbol' => $stock->getSymbol(),
-                    'provider' => $provider::class,
-                    'provider_error' => $exception->getMessage(),
+                $this->logProviderFailure('ohlc', $stock, $provider, $exception, [
+                    'requested_from' => \DateTimeImmutable::createFromInterface($from)->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d'),
+                    'requested_to' => \DateTimeImmutable::createFromInterface($to)->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d'),
+                    'fetch_from' => \DateTimeImmutable::createFromInterface($fetchFrom)->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d'),
+                    'latest_required_market_day' => $latestRequiredMarketDay->format('Y-m-d'),
+                    'cache_available' => $latest !== null,
+                    'latest_cached_date' => $latest?->getDate()->format('Y-m-d'),
                 ]);
             }
         }
@@ -297,6 +389,31 @@ final class MarketDataManager
         return $this->environment !== 'prod' && $this->allowMockProvider;
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logProviderFailure(
+        string $operation,
+        Stock $stock,
+        MarketDataProviderInterface $provider,
+        MarketDataProviderException $exception,
+        array $context = [],
+    ): void {
+        $previous = $exception->getPrevious();
+
+        $this->logger->warning('Stock market data API request failed.', $context + [
+            'operation' => $operation,
+            'symbol' => $stock->getSymbol(),
+            'stock_currency' => $stock->getCurrency(),
+            'stock_id' => $stock->getId(),
+            'provider' => $provider::class,
+            'provider_error' => $exception->getMessage(),
+            'exception_class' => $exception::class,
+            'previous_exception_class' => $previous !== null ? $previous::class : null,
+            'previous_exception_message' => $previous !== null ? $previous->getMessage() : null,
+        ]);
+    }
+
     private function reserveApiRequest(Stock $stock, MarketDataProviderInterface $provider, string $purpose): bool
     {
         if ($this->requestStack->getCurrentRequest() === null) {
@@ -334,6 +451,68 @@ final class MarketDataManager
 
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
+    }
+
+    /**
+     * @param array<string, Stock> $stocksBySymbol
+     * @param array<string, QuoteDto> $quotes
+     */
+    private function storeQuotes(array $stocksBySymbol, array $quotes, \DateTimeImmutable $now): void
+    {
+        foreach ($quotes as $symbol => $quote) {
+            $stock = $stocksBySymbol[$symbol] ?? null;
+            if ($stock === null) {
+                continue;
+            }
+
+            $entity = (new StockQuote())
+                ->setStock($stock)
+                ->setPrice($quote->price)
+                ->setChangeAmount($quote->change)
+                ->setChangePercent($quote->changePercent)
+                ->setCurrency($quote->currency)
+                ->setMarketTime($quote->marketTime)
+                ->setProvider($quote->provider)
+                ->setFetchedAt($now)
+                ->setUpdatedAt($now);
+
+            $this->entityManager->persist($entity);
+        }
+
+        $this->entityManager->flush();
+    }
+
+    /**
+     * @param list<Stock> $stocks
+     * @return array<string, Stock>
+     */
+    private function stocksForQuotes(array $stocks): array
+    {
+        $stocksBySymbol = [];
+        foreach ($stocks as $stock) {
+            $stocksBySymbol[$stock->getSymbol()] = $stock;
+        }
+
+        return $stocksBySymbol;
+    }
+
+    /**
+     * @param list<Stock> $stocks
+     * @return array<string, Stock>
+     */
+    private function uniqueStocksBySymbol(array $stocks): array
+    {
+        $unique = [];
+        foreach ($stocks as $stock) {
+            $symbol = $stock->getSymbol();
+            if ($symbol === '') {
+                continue;
+            }
+
+            $unique[$symbol] ??= $stock;
+        }
+
+        return $unique;
     }
 
     /**

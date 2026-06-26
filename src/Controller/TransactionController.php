@@ -17,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class TransactionController extends AbstractController
 {
-    private const TRANSACTIONS_PER_PAGE = 50;
+    private const TRANSACTIONS_PER_PAGE = 10;
 
     #[Route('/transactions', name: 'app_transactions')]
     public function index(

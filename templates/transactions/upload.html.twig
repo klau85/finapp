@@ -17,7 +17,7 @@
                 <div class="card-body">
                     <h2 class="h5 mb-3">CSV import</h2>
                     <div class="alert alert-info">
-                        For now, only US stocks can be imported.
+                        Custom and Revolut imports support USD rows for now. XTB imports support US and selected EU suffixes.
                     </div>
 
                     {% if brokerAccounts is empty %}
@@ -129,12 +129,19 @@
                                         <td>CLOSE BUY 0.14/0.34 @ 645.64</td>
                                         <td>90.39</td>
                                     </tr>
+                                    <tr>
+                                        <td>Stock purchase</td>
+                                        <td>VOW.DE</td>
+                                        <td>2026-04-15 10:20:00</td>
+                                        <td>OPEN BUY 1 @ 118.40</td>
+                                        <td>-118.40</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD price/currency. <br>
+                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD for .US or no-suffix tickers, and EUR for .DE, .FR, .PA, and .AS tickers. <br>
                             The absolute Amount value is saved separately in the selected broker account currency.<br>
-                            Rows with non-US tickers are marked invalid and skipped.
+                            Rows with unsupported ticker suffixes are marked invalid and skipped.
                         </p>
                     </div>
 

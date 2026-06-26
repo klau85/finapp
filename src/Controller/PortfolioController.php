@@ -21,7 +21,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 class PortfolioController extends AbstractController
 {
-    private const POSITIONS_PER_PAGE = 20;
+    private const POSITIONS_PER_PAGE = 10;
 
     #[Route('/portfolio', name: 'app_portfolio')]
     public function index(
@@ -84,6 +84,7 @@ class PortfolioController extends AbstractController
             'positions' => $paginatedPositions,
             'marketDataAvailable' => $marketDataAvailable,
             'partialMarketData' => !$marketDataAvailable && $hasPricedPositions,
+            'unavailableSymbols' => $unavailableSymbols,
             'exposure' => $this->buildExposure($positions),
             'totals' => [
                 'marketValue' => $hasPricedPositions ? array_reduce(
@@ -246,6 +247,7 @@ class PortfolioController extends AbstractController
     {
         $prices = [];
         $unavailable = [];
+        $stocks = [];
 
         foreach (array_unique($symbols) as $symbol) {
             $stock = $stockRepository->findOneBySymbol($symbol);
@@ -254,11 +256,17 @@ class PortfolioController extends AbstractController
                 continue;
             }
 
-            try {
-                $prices[$symbol] = $marketDataManager->getCurrentQuote($stock)->price;
-            } catch (MarketDataUnavailableException) {
+            $stocks[$symbol] = $stock;
+        }
+
+        $quotes = $marketDataManager->getCurrentQuotes(array_values($stocks));
+        foreach (array_keys($stocks) as $symbol) {
+            if (!isset($quotes[$symbol])) {
                 $unavailable[] = $symbol;
+                continue;
             }
+
+            $prices[$symbol] = $quotes[$symbol]->price;
         }
 
         return [$prices, $unavailable];

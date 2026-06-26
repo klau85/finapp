@@ -11,8 +11,9 @@ use App\Exception\MarketDataProviderException;
 use App\Service\DecimalMath;
 use Scheb\YahooFinanceApi\ApiClient;
 use Scheb\YahooFinanceApi\Results\HistoricalData;
+use Scheb\YahooFinanceApi\Results\Quote;
 
-final readonly class YahooProvider implements MarketDataProviderInterface
+final readonly class YahooProvider implements MarketDataProviderInterface, BatchQuoteProviderInterface
 {
     private const PROVIDER = 'yahoo';
 
@@ -39,17 +40,50 @@ final readonly class YahooProvider implements MarketDataProviderInterface
             throw new MarketDataProviderException('Yahoo Finance returned no quote data for this symbol.');
         }
 
-        $marketTime = $quote->getRegularMarketTime();
+        return $this->quoteDto($stock, $quote);
+    }
 
-        return new QuoteDto(
-            $stock->getSymbol(),
-            $this->decimal($quote->getRegularMarketPrice()),
-            $quote->getRegularMarketChange() !== null ? $this->decimal($quote->getRegularMarketChange()) : null,
-            $quote->getRegularMarketChangePercent() !== null ? $this->decimal($quote->getRegularMarketChangePercent(), 4) : null,
-            $quote->getCurrency() ?? $stock->getCurrency(),
-            $marketTime !== null ? \DateTimeImmutable::createFromInterface($marketTime)->setTimezone(new \DateTimeZone('UTC')) : null,
-            self::PROVIDER,
-        );
+    /**
+     * @param list<Stock> $stocks
+     * @return array<string, QuoteDto>
+     */
+    public function getCurrentQuotes(array $stocks): array
+    {
+        $stocksByYahooSymbol = [];
+        foreach ($stocks as $stock) {
+            $this->assertSupported($stock);
+            $stocksByYahooSymbol[$this->yahooSymbol($stock)] = $stock;
+        }
+
+        if ($stocksByYahooSymbol === []) {
+            return [];
+        }
+
+        try {
+            $quotes = $this->apiClient->getQuotes(array_keys($stocksByYahooSymbol));
+        } catch (\Throwable $exception) {
+            throw new MarketDataProviderException('Yahoo Finance batch quote request failed.', previous: $exception);
+        }
+
+        $result = [];
+        foreach ($quotes as $quote) {
+            if (!$quote instanceof Quote || $quote->getSymbol() === null) {
+                continue;
+            }
+
+            $stock = $stocksByYahooSymbol[strtoupper($quote->getSymbol())] ?? null;
+            if ($stock === null || $quote->getRegularMarketPrice() === null || $quote->getRegularMarketPrice() <= 0.0) {
+                continue;
+            }
+
+            $result[$stock->getSymbol()] = $this->quoteDto($stock, $quote);
+        }
+
+        if ($result === []) {
+            throw new MarketDataProviderException('Yahoo Finance returned no quote data for these symbols.');
+        }
+
+        return $result;
     }
 
     /**
@@ -111,6 +145,23 @@ final readonly class YahooProvider implements MarketDataProviderInterface
     private function yahooSymbol(Stock $stock): string
     {
         return strtoupper(trim($stock->getSymbol()));
+    }
+
+    private function quoteDto(Stock $stock, Quote $quote): QuoteDto
+    {
+        $marketTime = $quote->getRegularMarketTime();
+        $price = $quote->getRegularMarketPrice();
+        \assert($price !== null);
+
+        return new QuoteDto(
+            $stock->getSymbol(),
+            $this->decimal($price),
+            $quote->getRegularMarketChange() !== null ? $this->decimal($quote->getRegularMarketChange()) : null,
+            $quote->getRegularMarketChangePercent() !== null ? $this->decimal($quote->getRegularMarketChangePercent(), 4) : null,
+            $quote->getCurrency() ?? $stock->getCurrency(),
+            $marketTime !== null ? \DateTimeImmutable::createFromInterface($marketTime)->setTimezone(new \DateTimeZone('UTC')) : null,
+            self::PROVIDER,
+        );
     }
 
     private function decimal(float $value, int $scale = DecimalMath::SCALE): string

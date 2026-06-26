@@ -145,6 +145,13 @@
             {% else %}
                 Market data is unavailable at this moment.
             {% endif %}
+            {% if unavailableSymbols is not empty %}
+                <div class="mt-2 d-flex flex-wrap gap-2">
+                    {% for symbol in unavailableSymbols %}
+                        <span class="badge text-bg-light border">{{ symbol }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
         </div>
     {% endif %}
 

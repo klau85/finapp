@@ -38,6 +38,36 @@ final class YahooProviderTest extends TestCase
         self::assertSame('yahoo', $quote->provider);
     }
 
+    public function testCurrentQuotesUsesYahooBatchQuoteData(): void
+    {
+        $client = $this->createMock(ApiClient::class);
+        $client->expects($this->once())
+            ->method('getQuotes')
+            ->with(['NVDA', 'MSFT'])
+            ->willReturn([
+                new Quote([
+                    'symbol' => 'NVDA',
+                    'currency' => 'USD',
+                    'regularMarketPrice' => 147.5,
+                ]),
+                new Quote([
+                    'symbol' => 'MSFT',
+                    'currency' => 'USD',
+                    'regularMarketPrice' => 510.25,
+                ]),
+            ]);
+
+        $quotes = (new YahooProvider($client))->getCurrentQuotes([
+            (new Stock())->setSymbol('NVDA')->setCurrency('USD'),
+            (new Stock())->setSymbol('MSFT')->setCurrency('USD'),
+        ]);
+
+        self::assertSame(['NVDA', 'MSFT'], array_keys($quotes));
+        self::assertSame('147.50000000', $quotes['NVDA']->price);
+        self::assertSame('510.25000000', $quotes['MSFT']->price);
+        self::assertSame('yahoo', $quotes['MSFT']->provider);
+    }
+
     public function testDailyOhlcUsesYahooHistoricalData(): void
     {
         $from = new \DateTimeImmutable('2024-01-01', new \DateTimeZone('UTC'));

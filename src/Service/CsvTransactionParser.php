@@ -12,6 +12,7 @@ final class CsvTransactionParser
 {
     private const REQUIRED_COLUMNS = ['date', 'symbol', 'type', 'quantity', 'price', 'currency', 'fees'];
     private const XTB_REQUIRED_COLUMNS = ['type', 'ticker', 'time', 'comment', 'amount'];
+    private const XTB_EUR_SUFFIXES = ['.DE', '.FR', '.PA', '.AS'];
     private const REVOLUT_REQUIRED_COLUMNS = ['date', 'ticker', 'type', 'quantity', 'price per share', 'currency'];
 
     /**
@@ -304,12 +305,13 @@ final class CsvTransactionParser
             $errors[] = 'time must use YYYY-MM-DD HH:MM:SS.';
         }
 
-        $ticker = strtoupper(trim($data['ticker']));
-        $symbol = preg_replace('/\.US$/i', '', $ticker) ?? $ticker;
-        if ($ticker === '') {
+        [$symbol, $priceCurrency, $tickerError] = $this->mapXtbTicker($data['ticker']);
+        if ($tickerError !== null) {
+            $errors[] = $tickerError;
+        }
+
+        if (trim($data['ticker']) === '') {
             $errors[] = 'ticker is required.';
-        } elseif (!str_ends_with($ticker, '.US')) {
-            $errors[] = 'only US stocks can be imported for now. XTB ticker must end with .US.';
         }
 
         $quantity = '';
@@ -342,11 +344,38 @@ final class CsvTransactionParser
             'type' => $type ?? $data['type'],
             'quantity' => $quantity,
             'price' => $price,
-            'currency' => 'USD',
+            'currency' => $priceCurrency,
             'fees' => '0.00000000',
             'brokerAmount' => $brokerAmount,
             'brokerCurrency' => strtoupper($currency),
         ], $errors];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string|null}
+     */
+    private function mapXtbTicker(string $value): array
+    {
+        $ticker = strtoupper(trim($value));
+        if ($ticker === '') {
+            return ['', 'USD', null];
+        }
+
+        if (str_ends_with($ticker, '.US')) {
+            return [substr($ticker, 0, -3), 'USD', null];
+        }
+
+        foreach (self::XTB_EUR_SUFFIXES as $suffix) {
+            if (str_ends_with($ticker, $suffix)) {
+                return [$ticker, 'EUR', null];
+            }
+        }
+
+        if (!str_contains($ticker, '.')) {
+            return [$ticker, 'USD', null];
+        }
+
+        return [$ticker, 'USD', 'unsupported XTB ticker suffix. Supported suffixes are .US, .DE, .FR, .PA, .AS, or no suffix.'];
     }
 
     /**

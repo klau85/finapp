@@ -132,7 +132,11 @@ final readonly class TwelveDataProvider implements MarketDataProviderInterface
         }
 
         if (($data['status'] ?? null) === 'error' || isset($data['code']) && (int) $data['code'] >= 400) {
-            throw new MarketDataProviderException('Twelve Data returned an error response.');
+            throw new MarketDataProviderException(sprintf(
+                'Twelve Data returned an error response%s%s.',
+                isset($data['code']) ? ' code='.(string) $data['code'] : '',
+                isset($data['message']) && is_scalar($data['message']) ? ' message='.(string) $data['message'] : '',
+            ));
         }
 
         return $data;
