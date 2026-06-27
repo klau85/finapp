@@ -21,9 +21,14 @@ use Symfony\Component\HttpFoundation\RequestStack;
 
 final class MarketDataManager
 {
-    private const MAX_API_REQUESTS_PER_PAGE = 5;
+    private const MAX_BATCH_QUOTE_STOCKS = 5;
 
-    private int $apiRequestsThisPage = 0;
+    /**
+     * @var array<class-string<MarketDataProviderInterface>, true>
+     */
+    private array $apiProvidersUsedThisPage = [];
+
+    private ?int $trackedRequestId = null;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -54,7 +59,7 @@ final class MarketDataManager
         $providerException = null;
         foreach ($this->quoteProviders($stock) as $provider) {
             if (!$this->reserveApiRequest($stock, $provider, 'quote')) {
-                break;
+                continue;
             }
 
             try {
@@ -111,8 +116,17 @@ final class MarketDataManager
             return $quotes;
         }
 
+        $uncachedPending = array_diff_key($pending, $staleCache);
+        $cachedPending = array_intersect_key($pending, $staleCache);
+        $refreshCandidates = array_slice(
+            $uncachedPending + $cachedPending,
+            0,
+            self::MAX_BATCH_QUOTE_STOCKS,
+            true,
+        );
+
         $yahooStocks = array_values(array_filter(
-            $pending,
+            $refreshCandidates,
             fn (Stock $stock): bool => $this->yahooProvider->supports($stock),
         ));
 
@@ -133,24 +147,25 @@ final class MarketDataManager
             }
         }
 
-        foreach ($pending as $symbol => $stock) {
-            $providerException = null;
-            if ($this->twelveDataProvider->supports($stock) && $this->reserveApiRequest($stock, $this->twelveDataProvider, 'quote')) {
-                try {
-                    $quote = $this->twelveDataProvider->getCurrentQuote($stock);
-                    $this->storeQuote($stock, $quote, $now);
-                    $quotes[$symbol] = $quote;
+        $twelveDataStock = array_find(
+            $refreshCandidates,
+            fn (Stock $stock): bool => isset($pending[$stock->getSymbol()]) && $this->twelveDataProvider->supports($stock),
+        );
 
-                    continue;
-                } catch (MarketDataProviderException $exception) {
-                    $providerException = $exception;
-                    $this->logProviderFailure('quote', $stock, $this->twelveDataProvider, $exception, [
-                        'cache_available' => isset($staleCache[$symbol]),
-                        'cached_fetched_at' => ($staleCache[$symbol] ?? null)?->getFetchedAt()->format(\DateTimeInterface::ATOM),
-                    ]);
-                }
+        if ($twelveDataStock !== null && $this->reserveApiRequest($twelveDataStock, $this->twelveDataProvider, 'quote')) {
+            try {
+                $quote = $this->twelveDataProvider->getCurrentQuote($twelveDataStock);
+                $this->storeQuote($twelveDataStock, $quote, $now);
+                $quotes[$twelveDataStock->getSymbol()] = $quote;
+                unset($pending[$twelveDataStock->getSymbol()]);
+            } catch (MarketDataProviderException $exception) {
+                $this->logProviderFailure('quote', $twelveDataStock, $this->twelveDataProvider, $exception, [
+                    'cache_available' => isset($staleCache[$twelveDataStock->getSymbol()]),
+                ]);
             }
+        }
 
+        foreach ($pending as $symbol => $stock) {
             if (isset($staleCache[$symbol])) {
                 $quotes[$symbol] = $this->quoteFromEntity($staleCache[$symbol]);
                 continue;
@@ -158,14 +173,6 @@ final class MarketDataManager
 
             if ($this->canUseMockProvider() && $this->mockProvider->supports($stock)) {
                 $quotes[$symbol] = $this->mockProvider->getCurrentQuote($stock);
-                continue;
-            }
-
-            if ($providerException !== null) {
-                $this->logger->info('Market data quote unavailable for stock after provider fallback.', [
-                    'symbol' => $symbol,
-                    'provider_error' => $providerException->getMessage(),
-                ]);
             }
         }
 
@@ -209,7 +216,7 @@ final class MarketDataManager
         $providerException = null;
         foreach ($this->ohlcProviders($stock) as $provider) {
             if (!$this->reserveApiRequest($stock, $provider, 'ohlc')) {
-                break;
+                continue;
             }
 
             try {
@@ -298,7 +305,7 @@ final class MarketDataManager
 
     private function currentQuoteTtlMinutes(\DateTimeImmutable $now): int
     {
-        return $this->isUsMarketOpen($now) ? 15 : 60;
+        return $this->isUsMarketOpen($now) ? 30 : 120;
     }
 
     private function isUsMarketOpen(\DateTimeImmutable $now): bool
@@ -400,8 +407,7 @@ final class MarketDataManager
         array $context = [],
     ): void {
         $previous = $exception->getPrevious();
-
-        $this->logger->warning('Stock market data API request failed.', $context + [
+        $context += [
             'operation' => $operation,
             'symbol' => $stock->getSymbol(),
             'stock_currency' => $stock->getCurrency(),
@@ -411,27 +417,58 @@ final class MarketDataManager
             'exception_class' => $exception::class,
             'previous_exception_class' => $previous !== null ? $previous::class : null,
             'previous_exception_message' => $previous !== null ? $previous->getMessage() : null,
-        ]);
+        ];
+
+        if ($this->isRateLimitFailure($exception)) {
+            $this->logger->info('Stock market data API rate limit reached.', $context);
+
+            return;
+        }
+
+        $this->logger->warning('Stock market data API request failed.', $context);
+    }
+
+    private function isRateLimitFailure(MarketDataProviderException $exception): bool
+    {
+        $messages = [$exception->getMessage()];
+        if ($exception->getPrevious() !== null) {
+            $messages[] = $exception->getPrevious()->getMessage();
+        }
+
+        foreach ($messages as $message) {
+            if (str_contains($message, '429') || stripos($message, 'Too Many Requests') !== false || stripos($message, 'rate limit') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function reserveApiRequest(Stock $stock, MarketDataProviderInterface $provider, string $purpose): bool
     {
-        if ($this->requestStack->getCurrentRequest() === null) {
+        $request = $this->requestStack->getCurrentRequest();
+        if ($request === null) {
             return true;
         }
 
-        if ($this->apiRequestsThisPage >= self::MAX_API_REQUESTS_PER_PAGE) {
-            $this->logger->info('Market data API request limit reached for page render.', [
+        $requestId = spl_object_id($request);
+        if ($this->trackedRequestId !== $requestId) {
+            $this->trackedRequestId = $requestId;
+            $this->apiProvidersUsedThisPage = [];
+        }
+
+        $providerKey = $provider::class;
+        if (isset($this->apiProvidersUsedThisPage[$providerKey])) {
+            $this->logger->info('Market data API provider request limit reached for page render.', [
                 'symbol' => $stock->getSymbol(),
-                'provider' => $provider::class,
+                'provider' => $providerKey,
                 'purpose' => $purpose,
-                'limit' => self::MAX_API_REQUESTS_PER_PAGE,
             ]);
 
             return false;
         }
 
-        ++$this->apiRequestsThisPage;
+        $this->apiProvidersUsedThisPage[$providerKey] = true;
 
         return true;
     }

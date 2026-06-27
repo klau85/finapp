@@ -48,31 +48,31 @@ class DashboardController extends AbstractController
             $position['marketDataAvailable'] = $available;
         }
         unset($position);
+        $positionsWithMarketData = array_values(array_filter(
+            $positions,
+            static fn (array $position): bool => ($position['marketDataAvailable'] ?? false) === true,
+        ));
+        $hasPricedPositions = $positionsWithMarketData !== [];
         $recentTransactions = $transactionRepository->findRecentForUser($user, 5);
 
-        $portfolioValue = $marketDataAvailable ? array_reduce(
-            $positions,
-            static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['marketValue']),
-            DecimalMath::zero()
-        ) : null;
-        $unrealizedPl = $marketDataAvailable ? array_reduce(
-            $positions,
-            static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['unrealizedGain']),
-            DecimalMath::zero()
-        ) : null;
+        $portfolioValue = $hasPricedPositions ? $this->sumByCurrency($positionsWithMarketData, 'marketValue') : [];
+        $unrealizedPl = $hasPricedPositions ? $this->sumByCurrency($positionsWithMarketData, 'unrealizedGain') : [];
 
-        $brokerAllocation = $marketDataAvailable ? $this->buildBrokerAllocation($positions) : [];
-        $currencyExposure = $marketDataAvailable ? $this->buildCurrencyExposure($positions) : [];
+        $brokerAllocation = $hasPricedPositions ? $this->buildBrokerAllocation($positionsWithMarketData) : [];
+        $currencyExposure = $hasPricedPositions ? $this->buildCurrencyExposure($positionsWithMarketData) : [];
         $investedCapital = $positionLotRepository->getInvestedCapitalByCurrencyForUser($user);
 
         return $this->render('dashboard/index.html.twig', [
             'brokerAccounts' => $brokerAccounts->findForUser($user),
             'hasTransactions' => $transactionCount > 0,
             'marketDataAvailable' => $marketDataAvailable,
+            'partialMarketData' => !$marketDataAvailable && $hasPricedPositions,
+            'hasPricedPositions' => $hasPricedPositions,
+            'unavailableSymbols' => $unavailableSymbols,
             'positions' => $positions,
             'recentActivities' => $this->buildRecentActivity($recentTransactions, $formatter),
-            'biggestWinners' => $marketDataAvailable ? array_slice($this->positivePositions($this->sortByGain($positions, descending: true)), 0, 5) : [],
-            'biggestLosers' => $marketDataAvailable ? array_slice($this->negativePositions($this->sortByGain($positions, descending: false)), 0, 5) : [],
+            'biggestWinners' => $hasPricedPositions ? array_slice($this->positivePositions($this->sortByGain($positionsWithMarketData, descending: true)), 0, 5) : [],
+            'biggestLosers' => $hasPricedPositions ? array_slice($this->negativePositions($this->sortByGain($positionsWithMarketData, descending: false)), 0, 5) : [],
             'brokerAllocation' => $brokerAllocation,
             'currencyExposure' => $currencyExposure,
             'metrics' => [
@@ -81,6 +81,25 @@ class DashboardController extends AbstractController
                 'investedCapital' => $investedCapital,
             ],
         ]);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $positions
+     * @return array<string, string>
+     */
+    private function sumByCurrency(array $positions, string $field): array
+    {
+        $totals = [];
+
+        foreach ($positions as $position) {
+            $currency = (string) $position['currency'];
+            $totals[$currency] ??= DecimalMath::zero();
+            $totals[$currency] = DecimalMath::add($totals[$currency], (string) $position[$field]);
+        }
+
+        ksort($totals);
+
+        return $totals;
     }
 
     /**

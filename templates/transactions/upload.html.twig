@@ -17,7 +17,7 @@
                 <div class="card-body">
                     <h2 class="h5 mb-3">CSV import</h2>
                     <div class="alert alert-info">
-                        Custom and Revolut imports support USD rows for now. XTB imports support US and selected EU suffixes.
+                        Only US stocks and ETFs are supported for now. Use a <strong>.US</strong> suffix or no exchange suffix. Non-US rows are marked invalid and skipped.
                     </div>
 
                     {% if brokerAccounts is empty %}
@@ -129,19 +129,12 @@
                                         <td>CLOSE BUY 0.14/0.34 @ 645.64</td>
                                         <td>90.39</td>
                                     </tr>
-                                    <tr>
-                                        <td>Stock purchase</td>
-                                        <td>VOW.DE</td>
-                                        <td>2026-04-15 10:20:00</td>
-                                        <td>OPEN BUY 1 @ 118.40</td>
-                                        <td>-118.40</td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD for .US or no-suffix tickers, and EUR for .DE, .FR, .PA, and .AS tickers. <br>
+                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD for .US or no-suffix tickers.<br>
                             The absolute Amount value is saved separately in the selected broker account currency.<br>
-                            Rows with unsupported ticker suffixes are marked invalid and skipped.
+                            Non-US ticker suffixes are marked invalid and skipped.
                         </p>
                     </div>
 
@@ -190,7 +183,7 @@
                         </div>
                         <p class="text-secondary mb-0">Revolut imports support BUY - MARKET, SELL - MARKET, and STOCK SPLIT rows.<br>
                             Stock split rows adjust open FIFO lots and preserve the current cost basis.<br>
-                            Rows with empty tickers, non-USD prices, or non-USD currency are marked invalid and skipped.
+                            Rows with empty or non-US tickers, non-USD prices, or non-USD currency are marked invalid and skipped.
                         </p>
                     </div>
                 </div>

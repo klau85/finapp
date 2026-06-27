@@ -35,6 +35,32 @@ final class TwelveDataProviderTest extends TestCase
         self::assertSame('twelvedata', $quote->provider);
     }
 
+    public function testCurrentQuoteStripsUsSuffixForTwelveDataRequest(): void
+    {
+        $client = new MockHttpClient(function (string $method, string $url): MockResponse {
+            self::assertSame('GET', $method);
+            $parts = parse_url($url);
+            parse_str($parts['query'] ?? '', $query);
+            self::assertSame('NVDA', $query['symbol'] ?? null);
+
+            return new MockResponse('{"symbol":"NVDA","currency":"USD","close":"147.50"}');
+        });
+
+        $quote = $this->provider($client)->getCurrentQuote((new Stock())->setSymbol('NVDA.US')->setCurrency('USD'));
+
+        self::assertSame('NVDA.US', $quote->symbol);
+        self::assertSame('147.50000000', $quote->price);
+    }
+
+    public function testProviderOnlySupportsUsSymbolsForNow(): void
+    {
+        $provider = $this->provider(new MockHttpClient());
+
+        self::assertTrue($provider->supports((new Stock())->setSymbol('NVDA')->setCurrency('USD')));
+        self::assertTrue($provider->supports((new Stock())->setSymbol('NVDA.US')->setCurrency('USD')));
+        self::assertFalse($provider->supports((new Stock())->setSymbol('VOW.DE')->setCurrency('EUR')));
+    }
+
     public function testDailyOhlcUsesTwelveDataTimeSeriesEndpoint(): void
     {
         $client = new MockHttpClient(function (string $method, string $url): MockResponse {

@@ -65,7 +65,7 @@ CSV), $account);
         self::assertContains('type must be Stock purchase or Stock sell.', $rows[0]->errors);
     }
 
-    public function testXtbCsvMapsEuSuffixesToEurTransactions(): void
+    public function testXtbCsvRejectsEuSuffixes(): void
     {
         $account = (new BrokerAccount())
             ->setBrokerType('xtb')
@@ -78,13 +78,14 @@ Stock sell,MC.PA,2026-03-12 09:15:00,CLOSE BUY 0.5 @ 612.80,306.40
 CSV), $account);
 
         self::assertCount(2, $rows);
-        self::assertTrue($rows[0]->isValid());
+        self::assertFalse($rows[0]->isValid());
         self::assertSame('VOW.DE', $rows[0]->data['symbol']);
-        self::assertSame('EUR', $rows[0]->data['currency']);
+        self::assertSame('USD', $rows[0]->data['currency']);
         self::assertSame('USD', $rows[0]->data['brokerCurrency']);
-        self::assertTrue($rows[1]->isValid());
+        self::assertContains('Only US stocks and ETFs are supported for now. Use a .US suffix or no exchange suffix.', $rows[0]->errors);
+        self::assertFalse($rows[1]->isValid());
         self::assertSame('MC.PA', $rows[1]->data['symbol']);
-        self::assertSame('EUR', $rows[1]->data['currency']);
+        self::assertSame('USD', $rows[1]->data['currency']);
     }
 
     public function testXtbCsvMapsTickersWithoutSuffixToUsdTransactions(): void
@@ -119,7 +120,7 @@ CSV), $account);
         self::assertCount(1, $rows);
         self::assertFalse($rows[0]->isValid());
         self::assertSame('VOD.L', $rows[0]->data['symbol']);
-        self::assertContains('unsupported XTB ticker suffix. Supported suffixes are .US, .DE, .FR, .PA, .AS, or no suffix.', $rows[0]->errors);
+        self::assertContains('Only US stocks and ETFs are supported for now. Use a .US suffix or no exchange suffix.', $rows[0]->errors);
     }
 
     public function testCustomCsvStillUsesOriginalFormat(): void

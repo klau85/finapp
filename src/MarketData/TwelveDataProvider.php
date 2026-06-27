@@ -27,7 +27,7 @@ final readonly class TwelveDataProvider implements MarketDataProviderInterface
 
     public function supports(Stock $stock): bool
     {
-        return trim($this->apiKey) !== '' && trim($stock->getSymbol()) !== '';
+        return trim($this->apiKey) !== '' && $this->supportsSymbol($stock);
     }
 
     public function getCurrentQuote(Stock $stock): QuoteDto
@@ -38,28 +38,7 @@ final readonly class TwelveDataProvider implements MarketDataProviderInterface
             'symbol' => $this->symbol($stock),
         ]);
 
-        $price = $data['close'] ?? $data['price'] ?? null;
-        if (!is_numeric($price) || (float) $price <= 0.0) {
-            throw new MarketDataProviderException('Twelve Data returned no quote price for this symbol.');
-        }
-
-        $marketTime = null;
-        $timestamp = $data['timestamp'] ?? null;
-        if (is_numeric($timestamp) && (int) $timestamp > 0) {
-            $marketTime = (new \DateTimeImmutable('@'.(int) $timestamp))->setTimezone(new \DateTimeZone('UTC'));
-        } elseif (isset($data['datetime']) && is_string($data['datetime']) && $data['datetime'] !== '') {
-            $marketTime = new \DateTimeImmutable($data['datetime'], new \DateTimeZone('UTC'));
-        }
-
-        return new QuoteDto(
-            $stock->getSymbol(),
-            DecimalMath::normalize((string) $price),
-            isset($data['change']) && is_numeric($data['change']) ? DecimalMath::normalize((string) $data['change']) : null,
-            isset($data['percent_change']) && is_numeric($data['percent_change']) ? DecimalMath::normalize((string) $data['percent_change'], 4) : null,
-            isset($data['currency']) && is_string($data['currency']) && $data['currency'] !== '' ? $data['currency'] : $stock->getCurrency(),
-            $marketTime,
-            self::PROVIDER,
-        );
+        return $this->quoteDto($stock, $data);
     }
 
     /**
@@ -151,6 +130,47 @@ final readonly class TwelveDataProvider implements MarketDataProviderInterface
 
     private function symbol(Stock $stock): string
     {
-        return strtoupper(trim($stock->getSymbol()));
+        $symbol = strtoupper(trim($stock->getSymbol()));
+
+        return str_ends_with($symbol, '.US') ? substr($symbol, 0, -3) : $symbol;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function quoteDto(Stock $stock, array $data): QuoteDto
+    {
+        $price = $data['close'] ?? $data['price'] ?? null;
+        if (!is_numeric($price) || (float) $price <= 0.0) {
+            throw new MarketDataProviderException('Twelve Data returned no quote price for this symbol.');
+        }
+
+        $marketTime = null;
+        $timestamp = $data['timestamp'] ?? null;
+        if (is_numeric($timestamp) && (int) $timestamp > 0) {
+            $marketTime = (new \DateTimeImmutable('@'.(int) $timestamp))->setTimezone(new \DateTimeZone('UTC'));
+        } elseif (isset($data['datetime']) && is_string($data['datetime']) && $data['datetime'] !== '') {
+            $marketTime = new \DateTimeImmutable($data['datetime'], new \DateTimeZone('UTC'));
+        }
+
+        return new QuoteDto(
+            $stock->getSymbol(),
+            DecimalMath::normalize((string) $price),
+            isset($data['change']) && is_numeric($data['change']) ? DecimalMath::normalize((string) $data['change']) : null,
+            isset($data['percent_change']) && is_numeric($data['percent_change']) ? DecimalMath::normalize((string) $data['percent_change'], 4) : null,
+            isset($data['currency']) && is_string($data['currency']) && $data['currency'] !== '' ? $data['currency'] : $stock->getCurrency(),
+            $marketTime,
+            self::PROVIDER,
+        );
+    }
+
+    private function supportsSymbol(Stock $stock): bool
+    {
+        $symbol = strtoupper(trim($stock->getSymbol()));
+        if ($symbol === '') {
+            return false;
+        }
+
+        return !str_contains($symbol, '.') || str_ends_with($symbol, '.US');
     }
 }

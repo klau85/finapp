@@ -26,6 +26,9 @@ services:
         arguments:
             $clientOptions:
                 timeout: 15
+            $cache: '@cache.app'
+            $cacheTtl: 86400
+            $cacheKey: 'finapp_yahoo_finance_session_context'
 
     App\Logging\FileLogger:
         arguments:

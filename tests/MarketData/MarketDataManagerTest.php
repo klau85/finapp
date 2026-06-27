@@ -303,13 +303,13 @@ final class MarketDataManagerTest extends TestCase
         self::assertSame('mock', $quote->provider);
     }
 
-    public function testWebRequestLimitsRealProviderApiCallsToFive(): void
+    public function testWebRequestLimitsRealProviderApiCallsToOnePerProvider(): void
     {
         $quoteRepository = $this->createMock(StockQuoteRepository::class);
         $quoteRepository->method('findLatestForStock')->willReturn(null);
 
         $apiClient = $this->createMock(ApiClient::class);
-        $apiClient->expects($this->exactly(5))
+        $apiClient->expects($this->once())
             ->method('getQuote')
             ->willReturn(new Quote([
                 'symbol' => 'NVDA',
@@ -323,13 +323,11 @@ final class MarketDataManagerTest extends TestCase
             requestStack: $this->requestStackWithRequest(),
         );
 
-        for ($i = 1; $i <= 5; ++$i) {
-            $quote = $manager->getCurrentQuote((new Stock())->setSymbol('STOCK'.$i)->setCurrency('USD'));
-            self::assertSame('148.50000000', $quote->price);
-        }
+        $quote = $manager->getCurrentQuote((new Stock())->setSymbol('STOCK1')->setCurrency('USD'));
+        self::assertSame('148.50000000', $quote->price);
 
         $this->expectException(MarketDataUnavailableException::class);
-        $manager->getCurrentQuote((new Stock())->setSymbol('STOCK6')->setCurrency('USD'));
+        $manager->getCurrentQuote((new Stock())->setSymbol('STOCK2')->setCurrency('USD'));
     }
 
     private function manager(

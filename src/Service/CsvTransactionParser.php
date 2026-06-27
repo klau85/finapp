@@ -12,8 +12,8 @@ final class CsvTransactionParser
 {
     private const REQUIRED_COLUMNS = ['date', 'symbol', 'type', 'quantity', 'price', 'currency', 'fees'];
     private const XTB_REQUIRED_COLUMNS = ['type', 'ticker', 'time', 'comment', 'amount'];
-    private const XTB_EUR_SUFFIXES = ['.DE', '.FR', '.PA', '.AS'];
     private const REVOLUT_REQUIRED_COLUMNS = ['date', 'ticker', 'type', 'quantity', 'price per share', 'currency'];
+    private const US_STOCKS_ONLY_ERROR = 'Only US stocks and ETFs are supported for now. Use a .US suffix or no exchange suffix.';
 
     /**
      * @return list<ParsedCsvRow>
@@ -222,7 +222,7 @@ final class CsvTransactionParser
     {
         $normalized = [
             'date' => $data['date'],
-            'symbol' => strtoupper($data['symbol']),
+            'symbol' => $this->normalizeUsSymbol($data['symbol']),
             'type' => strtoupper($data['type']),
             'quantity' => $this->isDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'],
             'price' => $this->isDecimal($data['price']) ? DecimalMath::normalize($data['price']) : $data['price'],
@@ -253,6 +253,8 @@ final class CsvTransactionParser
 
         if ($data['symbol'] === '') {
             $errors[] = 'symbol is required.';
+        } elseif (!$this->isSupportedUsSymbol($data['symbol'])) {
+            $errors[] = self::US_STOCKS_ONLY_ERROR;
         }
 
         if (!in_array(strtoupper($data['type']), ['BUY', 'SELL'], true)) {
@@ -365,17 +367,11 @@ final class CsvTransactionParser
             return [substr($ticker, 0, -3), 'USD', null];
         }
 
-        foreach (self::XTB_EUR_SUFFIXES as $suffix) {
-            if (str_ends_with($ticker, $suffix)) {
-                return [$ticker, 'EUR', null];
-            }
-        }
-
         if (!str_contains($ticker, '.')) {
             return [$ticker, 'USD', null];
         }
 
-        return [$ticker, 'USD', 'unsupported XTB ticker suffix. Supported suffixes are .US, .DE, .FR, .PA, .AS, or no suffix.'];
+        return [$ticker, 'USD', self::US_STOCKS_ONLY_ERROR];
     }
 
     /**
@@ -402,9 +398,11 @@ final class CsvTransactionParser
             $errors[] = 'date must use a valid Revolut ISO timestamp.';
         }
 
-        $symbol = strtoupper(trim($data['ticker']));
+        $symbol = $this->normalizeUsSymbol($data['ticker']);
         if ($symbol === '') {
             $errors[] = 'ticker is required.';
+        } elseif (!$this->isSupportedUsSymbol($data['ticker'])) {
+            $errors[] = self::US_STOCKS_ONLY_ERROR;
         }
 
         $quantity = $this->isSignedDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'];
@@ -491,6 +489,20 @@ final class CsvTransactionParser
         }
 
         return $date->setTimezone(new \DateTimeZone('UTC'));
+    }
+
+    private function normalizeUsSymbol(string $value): string
+    {
+        $symbol = strtoupper(trim($value));
+
+        return str_ends_with($symbol, '.US') ? substr($symbol, 0, -3) : $symbol;
+    }
+
+    private function isSupportedUsSymbol(string $value): bool
+    {
+        $symbol = strtoupper(trim($value));
+
+        return $symbol !== '' && (!str_contains($symbol, '.') || str_ends_with($symbol, '.US'));
     }
 
     /**

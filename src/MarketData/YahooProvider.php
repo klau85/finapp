@@ -144,7 +144,17 @@ final readonly class YahooProvider implements MarketDataProviderInterface, Batch
 
     private function yahooSymbol(Stock $stock): string
     {
-        return strtoupper(trim($stock->getSymbol()));
+        $symbol = strtoupper(trim($stock->getSymbol()));
+
+        if (str_ends_with($symbol, '.US')) {
+            return substr($symbol, 0, -3);
+        }
+
+        if (str_ends_with($symbol, '.FR')) {
+            return substr($symbol, 0, -3).'.PA';
+        }
+
+        return $symbol;
     }
 
     private function quoteDto(Stock $stock, Quote $quote): QuoteDto

@@ -68,6 +68,47 @@ final class YahooProviderTest extends TestCase
         self::assertSame('yahoo', $quotes['MSFT']->provider);
     }
 
+    public function testCurrentQuotesMapsXtbSuffixesToYahooSymbols(): void
+    {
+        $client = $this->createMock(ApiClient::class);
+        $client->expects($this->once())
+            ->method('getQuotes')
+            ->with(['NVDA', 'EUNL.DE', 'MEUD.PA', 'SXR8.DE'])
+            ->willReturn([
+                new Quote([
+                    'symbol' => 'NVDA',
+                    'currency' => 'USD',
+                    'regularMarketPrice' => 147.5,
+                ]),
+                new Quote([
+                    'symbol' => 'EUNL.DE',
+                    'currency' => 'EUR',
+                    'regularMarketPrice' => 104.25,
+                ]),
+                new Quote([
+                    'symbol' => 'MEUD.PA',
+                    'currency' => 'EUR',
+                    'regularMarketPrice' => 90.1,
+                ]),
+                new Quote([
+                    'symbol' => 'SXR8.DE',
+                    'currency' => 'EUR',
+                    'regularMarketPrice' => 640.7,
+                ]),
+            ]);
+
+        $quotes = (new YahooProvider($client))->getCurrentQuotes([
+            (new Stock())->setSymbol('NVDA.US')->setCurrency('USD'),
+            (new Stock())->setSymbol('EUNL.DE')->setCurrency('EUR'),
+            (new Stock())->setSymbol('MEUD.FR')->setCurrency('EUR'),
+            (new Stock())->setSymbol('SXR8.DE')->setCurrency('EUR'),
+        ]);
+
+        self::assertSame(['NVDA.US', 'EUNL.DE', 'MEUD.FR', 'SXR8.DE'], array_keys($quotes));
+        self::assertSame('147.50000000', $quotes['NVDA.US']->price);
+        self::assertSame('90.10000000', $quotes['MEUD.FR']->price);
+    }
+
     public function testDailyOhlcUsesYahooHistoricalData(): void
     {
         $from = new \DateTimeImmutable('2024-01-01', new \DateTimeZone('UTC'));
