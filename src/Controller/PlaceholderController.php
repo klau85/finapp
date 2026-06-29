@@ -21,12 +21,6 @@ class PlaceholderController extends AbstractController
         return $this->redirectToRoute('app_transaction_upload');
     }
 
-    #[Route('/watchlist', name: 'app_watchlist')]
-    public function watchlist(): Response
-    {
-        return $this->page('Watchlist');
-    }
-
     #[Route('/settings', name: 'app_settings')]
     public function settings(Request $request, EntityManagerInterface $entityManager): Response
     {
@@ -60,13 +54,6 @@ class PlaceholderController extends AbstractController
 
         return $this->render('settings/index.html.twig', [
             'form' => $form,
-        ]);
-    }
-
-    private function page(string $title): Response
-    {
-        return $this->render('placeholder/page.html.twig', [
-            'title' => $title,
         ]);
     }
 }

@@ -49,7 +49,7 @@ final class SyncMarketOhlcCommand extends Command
             }
             $stocks = [$stock];
         } else {
-            $stocks = $this->stockRepository->findOwnedOrWatchedStocks();
+            $stocks = $this->stockRepository->findOwnedStocks();
         }
 
         $synced = 0;

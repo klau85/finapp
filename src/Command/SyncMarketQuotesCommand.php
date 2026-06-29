@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:market-data:sync-quotes', description: 'Refresh current quotes for owned and watched stocks.')]
+#[AsCommand(name: 'app:market-data:sync-quotes', description: 'Refresh current quotes for owned stocks.')]
 final class SyncMarketQuotesCommand extends Command
 {
     public function __construct(
@@ -29,7 +29,7 @@ final class SyncMarketQuotesCommand extends Command
         $synced = 0;
         $failed = 0;
 
-        foreach ($this->stockRepository->findOwnedOrWatchedStocks() as $stock) {
+        foreach ($this->stockRepository->findOwnedStocks() as $stock) {
             try {
                 $this->marketDataManager->getCurrentQuote($stock);
                 ++$synced;

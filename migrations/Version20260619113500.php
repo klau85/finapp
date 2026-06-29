@@ -11,7 +11,7 @@ final class Version20260619113500 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Create portfolio tracker users, broker accounts, transactions, FIFO lot, realized trade, price, and watchlist tables.';
+        return 'Create portfolio tracker users, broker accounts, transactions, FIFO lot, realized trade, and price tables.';
     }
 
     public function up(Schema $schema): void
@@ -24,7 +24,6 @@ final class Version20260619113500 extends AbstractMigration
         $this->addSql('CREATE TABLE position_lot (id INT AUTO_INCREMENT NOT NULL, user_id INT NOT NULL, broker_account_id INT NOT NULL, stock_id INT NOT NULL, buy_transaction_id INT NOT NULL, quantity_original NUMERIC(20, 8) NOT NULL, quantity_remaining NUMERIC(20, 8) NOT NULL, price NUMERIC(20, 8) NOT NULL, fees_allocated NUMERIC(20, 8) NOT NULL, opened_at DATETIME NOT NULL, created_at DATETIME NOT NULL, INDEX idx_position_lot_user (user_id), INDEX idx_position_lot_broker_account (broker_account_id), INDEX idx_position_lot_stock (stock_id), INDEX IDX_FF372103336966C1 (buy_transaction_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
         $this->addSql('CREATE TABLE realized_trade (id INT AUTO_INCREMENT NOT NULL, user_id INT NOT NULL, broker_account_id INT NOT NULL, stock_id INT NOT NULL, buy_transaction_id INT NOT NULL, sell_transaction_id INT NOT NULL, quantity NUMERIC(20, 8) NOT NULL, buy_price NUMERIC(20, 8) NOT NULL, sell_price NUMERIC(20, 8) NOT NULL, fees_allocated NUMERIC(20, 8) NOT NULL, profit NUMERIC(20, 8) NOT NULL, profit_percent NUMERIC(10, 4) NOT NULL, holding_days INT NOT NULL, opened_at DATETIME NOT NULL, closed_at DATETIME NOT NULL, created_at DATETIME NOT NULL, INDEX idx_realized_trade_user (user_id), INDEX idx_realized_trade_broker_account (broker_account_id), INDEX idx_realized_trade_stock (stock_id), INDEX IDX_CA32ED7B336966C1 (buy_transaction_id), INDEX IDX_CA32ED7B5E55B330 (sell_transaction_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
         $this->addSql('CREATE TABLE stock_price (id INT AUTO_INCREMENT NOT NULL, stock_id INT NOT NULL, date DATE NOT NULL, open NUMERIC(20, 8) NOT NULL, high NUMERIC(20, 8) NOT NULL, low NUMERIC(20, 8) NOT NULL, close NUMERIC(20, 8) NOT NULL, volume INT DEFAULT NULL, INDEX idx_stock_price_stock (stock_id), INDEX idx_stock_price_date (date), UNIQUE INDEX uniq_stock_price_stock_date (stock_id, date), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
-        $this->addSql('CREATE TABLE watchlist_item (id INT AUTO_INCREMENT NOT NULL, user_id INT NOT NULL, stock_id INT NOT NULL, created_at DATETIME NOT NULL, INDEX idx_watchlist_item_user (user_id), INDEX idx_watchlist_item_stock (stock_id), UNIQUE INDEX uniq_watchlist_user_stock (user_id, stock_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
 
         $this->addSql('ALTER TABLE broker_account ADD CONSTRAINT FK_BROKER_ACCOUNT_USER FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE');
         $this->addSql('ALTER TABLE import_file ADD CONSTRAINT FK_IMPORT_FILE_USER FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE');
@@ -43,14 +42,10 @@ final class Version20260619113500 extends AbstractMigration
         $this->addSql('ALTER TABLE realized_trade ADD CONSTRAINT FK_REALIZED_TRADE_BUY_TRANSACTION FOREIGN KEY (buy_transaction_id) REFERENCES transactions (id) ON DELETE CASCADE');
         $this->addSql('ALTER TABLE realized_trade ADD CONSTRAINT FK_REALIZED_TRADE_SELL_TRANSACTION FOREIGN KEY (sell_transaction_id) REFERENCES transactions (id) ON DELETE CASCADE');
         $this->addSql('ALTER TABLE stock_price ADD CONSTRAINT FK_STOCK_PRICE_STOCK FOREIGN KEY (stock_id) REFERENCES stock (id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE watchlist_item ADD CONSTRAINT FK_WATCHLIST_ITEM_USER FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE watchlist_item ADD CONSTRAINT FK_WATCHLIST_ITEM_STOCK FOREIGN KEY (stock_id) REFERENCES stock (id) ON DELETE CASCADE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE watchlist_item DROP FOREIGN KEY FK_WATCHLIST_ITEM_STOCK');
-        $this->addSql('ALTER TABLE watchlist_item DROP FOREIGN KEY FK_WATCHLIST_ITEM_USER');
         $this->addSql('ALTER TABLE stock_price DROP FOREIGN KEY FK_STOCK_PRICE_STOCK');
         $this->addSql('ALTER TABLE realized_trade DROP FOREIGN KEY FK_REALIZED_TRADE_SELL_TRANSACTION');
         $this->addSql('ALTER TABLE realized_trade DROP FOREIGN KEY FK_REALIZED_TRADE_BUY_TRANSACTION');
@@ -68,7 +63,6 @@ final class Version20260619113500 extends AbstractMigration
         $this->addSql('ALTER TABLE import_file DROP FOREIGN KEY FK_IMPORT_FILE_BROKER_ACCOUNT');
         $this->addSql('ALTER TABLE import_file DROP FOREIGN KEY FK_IMPORT_FILE_USER');
         $this->addSql('ALTER TABLE broker_account DROP FOREIGN KEY FK_BROKER_ACCOUNT_USER');
-        $this->addSql('DROP TABLE watchlist_item');
         $this->addSql('DROP TABLE stock_price');
         $this->addSql('DROP TABLE realized_trade');
         $this->addSql('DROP TABLE position_lot');

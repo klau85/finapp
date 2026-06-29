@@ -19,18 +19,15 @@ class StockRepository extends ServiceEntityRepository
     /**
      * @return list<Stock>
      */
-    public function findOwnedOrWatchedStocks(): array
+    public function findOwnedStocks(): array
     {
-        $ownedRows = $this->getEntityManager()->createQuery(
+        $rows = $this->getEntityManager()->createQuery(
             'SELECT DISTINCT stock.id AS id FROM App\Entity\Transaction transaction JOIN transaction.stock stock'
-        )->getArrayResult();
-        $watchedRows = $this->getEntityManager()->createQuery(
-            'SELECT DISTINCT stock.id AS id FROM App\Entity\WatchlistItem item JOIN item.stock stock'
         )->getArrayResult();
 
         $ids = array_values(array_unique(array_map(
             static fn (array $row): int => (int) $row['id'],
-            array_merge($ownedRows, $watchedRows),
+            $rows,
         )));
 
         if ($ids === []) {
