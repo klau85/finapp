@@ -58,12 +58,12 @@ class NumberFormatExtension extends AbstractExtension
         $number = ltrim($number, '+-');
 
         if (stripos($number, 'e') !== false) {
-            $formatted = rtrim(rtrim(sprintf('%.4F', (float) ($negative ? '-'.$number : $number)), '0'), '.');
+            $formatted = rtrim(rtrim(sprintf('%.2F', (float) ($negative ? '-'.$number : $number)), '0'), '.');
 
             return $this->localize($formatted === '-0' ? '0' : $formatted, $minimumMoneyDecimals);
         }
 
-        $rounded = number_format((float) ($negative ? '-'.$number : $number), 4, '.', '');
+        $rounded = number_format((float) ($negative ? '-'.$number : $number), 2, '.', '');
         $negative = str_starts_with($rounded, '-');
         $rounded = ltrim($rounded, '+-');
 
