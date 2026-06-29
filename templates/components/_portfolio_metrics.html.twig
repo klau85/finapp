@@ -1,0 +1,56 @@
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 mb-4">
+    {% set cards = [
+        {
+            label: 'Portfolio Value',
+            values: metrics.portfolioValue,
+            tooltip: 'The current market value of your open positions with available prices.',
+            unavailable: 'Unavailable',
+            signed: false
+        },
+        {
+            label: 'Invested Capital',
+            values: metrics.investedCapital,
+            tooltip: 'The remaining cost basis of all open FIFO lots.',
+            unavailable: '$0',
+            signed: false
+        },
+        {
+            label: 'Realized P/L',
+            values: metrics.realizedPl,
+            tooltip: 'Profit or loss already completed through FIFO-matched sales.',
+            unavailable: 'Unavailable',
+            signed: true
+        },
+        {
+            label: 'Unrealized P/L',
+            values: metrics.unrealizedPl,
+            tooltip: 'The estimated profit or loss on positions you still hold.',
+            unavailable: 'Unavailable',
+            signed: true
+        },
+        {
+            label: 'Total P/L',
+            values: metrics.totalPl,
+            tooltip: 'Realized P/L plus unrealized P/L for positions with available prices.',
+            unavailable: 'Unavailable',
+            signed: true
+        }
+    ] %}
+
+    {% for card in cards %}
+        <div class="col">
+            <div class="card metric-card summary-metric-card h-100">
+                <div class="card-body">
+                    <div class="text-secondary mb-2 metric-label" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ card.tooltip }}">{{ card.label }}</div>
+                    {% if card.values %}
+                        {% for currency, amount in card.values %}
+                            <div class="h5 mb-1 {{ card.signed ? (amount starts with '-' ? 'text-negative' : 'text-positive') }}">{{ amount|money_symbol(currency) }}</div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="h3 mb-0">{{ card.unavailable }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

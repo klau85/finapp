@@ -89,54 +89,7 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card metric-card">
-                <div class="card-body">
-                    <div class="text-secondary mb-2">Market Value</div>
-                    <div class="h3 mb-0">{{ totals.marketValue is not null ? totals.marketValue|money_symbol('USD') : 'Unavailable' }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card metric-card">
-                <div class="card-body">
-                    <div class="text-secondary mb-2">Realized P/L</div>
-                    <div class="h3 mb-0 {{ totals.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                        {{ totals.realizedGain|money_symbol('USD') }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card metric-card">
-                <div class="card-body">
-                    <div class="text-secondary mb-2">Unrealized P/L</div>
-                    {% if totals.unrealizedGain is not null %}
-                        <div class="h3 mb-0 {{ totals.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                            {{ totals.unrealizedGain|money_symbol('USD') }}
-                        </div>
-                    {% else %}
-                        <div class="h3 mb-0">Unavailable</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card metric-card">
-                <div class="card-body">
-                    <div class="text-secondary mb-2">Total P/L</div>
-                    {% if totals.totalGain is not null %}
-                        <div class="h3 mb-0 {{ totals.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                            {{ totals.totalGain|money_symbol('USD') }}
-                        </div>
-                    {% else %}
-                        <div class="h3 mb-0">Unavailable</div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'components/_portfolio_metrics.html.twig' with { metrics: metrics } only %}
 
     {% if not marketDataAvailable %}
         <div class="alert alert-warning">

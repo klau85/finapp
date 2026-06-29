@@ -20,50 +20,7 @@
             </div>
         </div>
     {% else %}
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card metric-card">
-                    <div class="card-body">
-                        <div class="text-secondary mb-2">Portfolio Value</div>
-                        {% if metrics.portfolioValue %}
-                            {% for currency, amount in metrics.portfolioValue %}
-                                <div class="h5 mb-1">{{ amount|money_symbol(currency) }}</div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="h3 mb-0">Unavailable</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card metric-card">
-                    <div class="card-body">
-                        <div class="text-secondary mb-2">Unrealized P/L</div>
-                        {% if metrics.unrealizedPl %}
-                            {% for currency, amount in metrics.unrealizedPl %}
-                                <div class="h5 mb-1 {{ amount starts with '-' ? 'text-negative' : 'text-positive' }}">{{ amount|money_symbol(currency) }}</div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="h3 mb-0">Unavailable</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card metric-card">
-                    <div class="card-body">
-                        <div class="text-secondary mb-2">Invested Capital</div>
-                        {% if metrics.investedCapital %}
-                            {% for currency, amount in metrics.investedCapital %}
-                                <div class="h5 mb-1">{{ amount|money_symbol(currency) }}</div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="h3 mb-0">$0</div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
+        {% include 'components/_portfolio_metrics.html.twig' with { metrics: metrics } only %}
 
         {% if partialMarketData %}
             <div class="alert alert-warning">

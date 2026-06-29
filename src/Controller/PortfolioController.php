@@ -14,6 +14,7 @@ use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
 use App\Service\PortfolioAnalyticsService;
+use App\Service\PortfolioMetricsService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,6 +31,7 @@ class PortfolioController extends AbstractController
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
         BrokerAccountRepository $brokerAccountRepository,
+        PortfolioMetricsService $portfolioMetrics,
     ): Response {
         $user = $this->getUser();
         \assert($user instanceof User);
@@ -86,28 +88,7 @@ class PortfolioController extends AbstractController
             'partialMarketData' => !$marketDataAvailable && $hasPricedPositions,
             'unavailableSymbols' => $unavailableSymbols,
             'exposure' => $this->buildExposure($positions),
-            'totals' => [
-                'marketValue' => $hasPricedPositions ? array_reduce(
-                    $positionsWithMarketData,
-                    static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['marketValue']),
-                    DecimalMath::zero()
-                ) : null,
-                'realizedGain' => array_reduce(
-                    $positions,
-                    static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['realizedGain']),
-                    DecimalMath::zero()
-                ),
-                'unrealizedGain' => $hasPricedPositions ? array_reduce(
-                    $positionsWithMarketData,
-                    static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['unrealizedGain']),
-                    DecimalMath::zero()
-                ) : null,
-                'totalGain' => $hasPricedPositions ? array_reduce(
-                    $positionsWithMarketData,
-                    static fn (string $carry, array $position): string => DecimalMath::add($carry, $position['totalGain']),
-                    DecimalMath::zero()
-                ) : null,
-            ],
+            'metrics' => $portfolioMetrics->calculate($user, $positionsWithMarketData, $selectedBrokerAccount),
             'pagination' => [
                 'currentPage' => $currentPage,
                 'totalPages' => $totalPages,

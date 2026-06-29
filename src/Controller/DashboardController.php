@@ -7,11 +7,11 @@ namespace App\Controller;
 use App\Entity\User;
 use App\MarketData\MarketDataManager;
 use App\Repository\BrokerAccountRepository;
-use App\Repository\PositionLotRepository;
 use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
 use App\Service\PortfolioAnalyticsService;
+use App\Service\PortfolioMetricsService;
 use App\Twig\NumberFormatExtension;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -26,7 +26,7 @@ class DashboardController extends AbstractController
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockRepository $stockRepository,
-        PositionLotRepository $positionLotRepository,
+        PortfolioMetricsService $portfolioMetrics,
         NumberFormatExtension $formatter,
     ): Response {
         $user = $this->getUser();
@@ -53,12 +53,8 @@ class DashboardController extends AbstractController
         $hasPricedPositions = $positionsWithMarketData !== [];
         $recentTransactions = $transactionRepository->findRecentForUser($user, 5);
 
-        $portfolioValue = $hasPricedPositions ? $this->sumByCurrency($positionsWithMarketData, 'marketValue') : [];
-        $unrealizedPl = $hasPricedPositions ? $this->sumByCurrency($positionsWithMarketData, 'unrealizedGain') : [];
-
         $brokerAllocation = $hasPricedPositions ? $this->buildBrokerAllocation($positionsWithMarketData) : [];
         $currencyExposure = $hasPricedPositions ? $this->buildCurrencyExposure($positionsWithMarketData) : [];
-        $investedCapital = $positionLotRepository->getInvestedCapitalByCurrencyForUser($user);
 
         return $this->render('dashboard/index.html.twig', [
             'brokerAccounts' => $brokerAccounts->findForUser($user),
@@ -73,31 +69,8 @@ class DashboardController extends AbstractController
             'biggestLosers' => $hasPricedPositions ? array_slice($this->negativePositions($this->sortByGain($positionsWithMarketData, descending: false)), 0, 5) : [],
             'brokerAllocation' => $brokerAllocation,
             'currencyExposure' => $currencyExposure,
-            'metrics' => [
-                'portfolioValue' => $portfolioValue,
-                'unrealizedPl' => $unrealizedPl,
-                'investedCapital' => $investedCapital,
-            ],
+            'metrics' => $portfolioMetrics->calculate($user, $positionsWithMarketData),
         ]);
-    }
-
-    /**
-     * @param list<array<string, mixed>> $positions
-     * @return array<string, string>
-     */
-    private function sumByCurrency(array $positions, string $field): array
-    {
-        $totals = [];
-
-        foreach ($positions as $position) {
-            $currency = (string) $position['currency'];
-            $totals[$currency] ??= DecimalMath::zero();
-            $totals[$currency] = DecimalMath::add($totals[$currency], (string) $position[$field]);
-        }
-
-        ksort($totals);
-
-        return $totals;
     }
 
     /**

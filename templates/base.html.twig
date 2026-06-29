@@ -29,6 +29,11 @@
                 .app-sidebar {
                     background: var(--app-sidebar);
                     color: #fff;
+                    flex: 0 0 260px;
+                    height: 100vh;
+                    overflow-y: auto;
+                    position: sticky;
+                    top: 0;
                     width: 260px;
                 }
 
@@ -64,6 +69,16 @@
 
                 .metric-card {
                     min-height: 132px;
+                }
+
+                .summary-metric-card {
+                    min-height: 0;
+                }
+
+                .metric-label[data-bs-toggle="tooltip"] {
+                    cursor: help;
+                    text-decoration: underline dotted;
+                    text-underline-offset: 3px;
                 }
 
                 .text-positive {
@@ -175,5 +190,12 @@
                 </main>
             {% endif %}
         {% endblock %}
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((element) => {
+                    new bootstrap.Tooltip(element);
+                });
+            });
+        </script>
     </body>
 </html>

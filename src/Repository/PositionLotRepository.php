@@ -57,23 +57,30 @@ class PositionLotRepository extends ServiceEntityRepository
     /**
      * @return array<string, string>
      */
-    public function getInvestedCapitalByCurrencyForUser(User $user): array
+    public function getInvestedCapitalByCurrencyForUser(User $user, ?BrokerAccount $brokerAccount = null): array
     {
-        $rows = $this->createQueryBuilder('positionLot')
+        $queryBuilder = $this->createQueryBuilder('positionLot')
             ->select('stock.currency AS currency')
             ->addSelect('SUM(positionLot.quantityRemaining * positionLot.price) AS investedCapital')
             ->join('positionLot.stock', 'stock')
             ->andWhere('positionLot.user = :user')
             ->andWhere('positionLot.quantityRemaining > 0')
             ->setParameter('user', $user)
-            ->groupBy('stock.currency')
-            ->getQuery()
-            ->getArrayResult();
+            ->groupBy('stock.currency');
+
+        if ($brokerAccount !== null) {
+            $queryBuilder
+                ->andWhere('positionLot.brokerAccount = :brokerAccount')
+                ->setParameter('brokerAccount', $brokerAccount);
+        }
+
+        $rows = $queryBuilder->getQuery()->getArrayResult();
 
         $indexed = [];
         foreach ($rows as $row) {
             $indexed[(string) $row['currency']] = (string) $row['investedCapital'];
         }
+        ksort($indexed);
 
         return $indexed;
     }
