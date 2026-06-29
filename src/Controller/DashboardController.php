@@ -39,7 +39,11 @@ class DashboardController extends AbstractController
         \assert($user instanceof User);
 
         $transactionCount = $transactionRepository->countForUser($user);
-        $symbols = $transactionRepository->findSymbolsForUser($user);
+        $openPositions = $portfolioAnalytics->getOpenPositionSummaries($user);
+        $symbols = array_map(
+            static fn (array $position): string => $position['symbol'],
+            $openPositions,
+        );
         [$currentPrices, $unavailableSymbols] = $this->loadCurrentPrices($symbols, $stockRepository, $marketDataManager);
         $marketDataAvailable = $unavailableSymbols === [];
         $positions = $portfolioAnalytics->getAggregatedPortfolio($user, $currentPrices);

@@ -129,15 +129,15 @@ final class MarketDataManagerTest extends TestCase
         self::assertSame('twelvedata', $quote->provider);
     }
 
-    public function testQuoteCacheTtlIsFifteenMinutesDuringUsMarketHours(): void
+    public function testQuoteCacheTtlDuringUsMarketHours(): void
     {
-        self::assertSame(15, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 14:00:00', new \DateTimeZone('UTC'))));
+        self::assertSame(30, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 14:00:00', new \DateTimeZone('UTC'))));
     }
 
-    public function testQuoteCacheTtlIsSixtyMinutesOutsideUsMarketHours(): void
+    public function testQuoteCacheTtlOutsideUsMarketHours(): void
     {
-        self::assertSame(60, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 22:00:00', new \DateTimeZone('UTC'))));
-        self::assertSame(60, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-27 14:00:00', new \DateTimeZone('UTC'))));
+        self::assertSame(120, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-24 22:00:00', new \DateTimeZone('UTC'))));
+        self::assertSame(120, $this->quoteTtlMinutes(new \DateTimeImmutable('2026-06-27 14:00:00', new \DateTimeZone('UTC'))));
     }
 
     public function testOhlcCacheHitReturnsCachedCandles(): void

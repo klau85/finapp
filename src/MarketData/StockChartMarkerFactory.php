@@ -99,9 +99,16 @@ final readonly class StockChartMarkerFactory
      */
     private function marker(string $time, string $type, array $details): array
     {
-        $buy = $type === 'BUY';
+        $buy = in_array($type, ['BUY', 'MERGER_IN'], true);
         $split = $type === 'STOCK_SPLIT';
-        $label = $split ? 'SP' : ($buy ? 'B' : 'S');
+        $merger = str_starts_with($type, 'MERGER_');
+        $label = match ($type) {
+            'STOCK_SPLIT' => 'SP',
+            'MERGER_IN' => 'MI',
+            'MERGER_OUT' => 'MO',
+            'MERGER_CASH' => 'MC',
+            default => $buy ? 'B' : 'S',
+        };
         if (count($details) > 1) {
             $label .= (string) count($details);
         }
@@ -109,8 +116,8 @@ final readonly class StockChartMarkerFactory
         return [
             'time' => $time,
             'position' => $buy ? 'belowBar' : 'aboveBar',
-            'color' => $split ? '#6b7280' : ($buy ? '#16a34a' : '#dc2626'),
-            'shape' => $split ? 'circle' : ($buy ? 'arrowUp' : 'arrowDown'),
+            'color' => ($split || $merger) ? '#6b7280' : ($buy ? '#16a34a' : '#dc2626'),
+            'shape' => ($split || $merger) ? 'circle' : ($buy ? 'arrowUp' : 'arrowDown'),
             'text' => $label,
             'type' => $type,
             'details' => $details,
@@ -125,7 +132,7 @@ final readonly class StockChartMarkerFactory
             '%s %s%s%s',
             str_replace('_', ' ', $transaction->getType()),
             $this->formatter->trimNumber($transaction->getQuantity()),
-            $transaction->getType() !== 'STOCK_SPLIT' ? ' @ '.$this->formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()) : '',
+            in_array($transaction->getType(), ['BUY', 'SELL'], true) ? ' @ '.$this->formatter->moneySymbol($transaction->getPrice(), $transaction->getCurrency()) : '',
             $brokerAccount !== null ? ' - '.$brokerAccount->getDisplayName() : '',
         );
     }

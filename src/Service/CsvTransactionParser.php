@@ -77,6 +77,10 @@ final class CsvTransactionParser
                 $data['amount'] = trim((string) ($csvRow[$columnIndexes['amount']] ?? ''));
             }
 
+            if (isset($columnIndexes['amount currency'])) {
+                $data['amount currency'] = trim((string) ($csvRow[$columnIndexes['amount currency']] ?? ''));
+            }
+
             $normalized = $this->normalize($data, $brokerCurrency);
             $rows[] = new ParsedCsvRow($rowNumber, $normalized, $this->validate($data));
         }
@@ -187,6 +191,10 @@ final class CsvTransactionParser
                 $revolutData[$column] = trim((string) ($csvRow[$columnIndexes[$column]] ?? ''));
             }
 
+            if (isset($columnIndexes['total amount'])) {
+                $revolutData['total amount'] = trim((string) ($csvRow[$columnIndexes['total amount']] ?? ''));
+            }
+
             [$data, $errors] = $this->normalizeRevolut($revolutData);
             $rows[] = new ParsedCsvRow($rowNumber, $data, $errors);
         }
@@ -197,7 +205,7 @@ final class CsvTransactionParser
             return [new ParsedCsvRow(1, [], ['CSV file contains no transaction rows.'])];
         }
 
-        return $rows;
+        return $this->linkRevolutMergerRows($rows);
     }
 
     /**
@@ -232,7 +240,7 @@ final class CsvTransactionParser
 
         if (($data['amount'] ?? '') !== '' && ($brokerAmount = $this->normalizeAbsoluteDecimal($data['amount'])) !== null) {
             $normalized['brokerAmount'] = $brokerAmount;
-            $normalized['brokerCurrency'] = strtoupper($brokerCurrency);
+            $normalized['brokerCurrency'] = strtoupper($data['amount currency'] ?? '') ?: strtoupper($brokerCurrency);
         }
 
         return $normalized;
@@ -279,6 +287,15 @@ final class CsvTransactionParser
 
         if (($data['amount'] ?? '') !== '' && $this->normalizeAbsoluteDecimal($data['amount']) === null) {
             $errors[] = 'amount must be a decimal value.';
+        }
+
+        $amountCurrency = strtoupper($data['amount currency'] ?? '');
+        if ($amountCurrency !== '' && preg_match('/^[A-Z]{3}$/', $amountCurrency) !== 1) {
+            $errors[] = 'amount currency must be a 3-letter code.';
+        }
+
+        if ($amountCurrency !== '' && ($data['amount'] ?? '') === '') {
+            $errors[] = 'amount currency requires an amount.';
         }
 
         return $errors;
@@ -382,10 +399,13 @@ final class CsvTransactionParser
     {
         $errors = [];
 
-        $type = match (strtoupper($data['type'])) {
+        $rawType = strtoupper($data['type']);
+        $type = match ($rawType) {
             'BUY - MARKET' => Transaction::TYPE_BUY,
             'SELL - MARKET' => Transaction::TYPE_SELL,
             'STOCK SPLIT' => Transaction::TYPE_STOCK_SPLIT,
+            'MERGER - CASH' => Transaction::TYPE_MERGER_CASH,
+            'MERGER - STOCK' => $this->mergerStockType($data['quantity']),
             default => null,
         };
 
@@ -405,18 +425,27 @@ final class CsvTransactionParser
             $errors[] = self::US_STOCKS_ONLY_ERROR;
         }
 
-        $quantity = $this->isSignedDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity'];
-        if ($type === Transaction::TYPE_STOCK_SPLIT) {
+        $quantity = $type === Transaction::TYPE_MERGER_CASH
+            ? DecimalMath::zero()
+            : ($this->isSignedDecimal($data['quantity']) ? DecimalMath::normalize($data['quantity']) : $data['quantity']);
+        if (in_array($type, [Transaction::TYPE_STOCK_SPLIT, Transaction::TYPE_MERGER_IN, Transaction::TYPE_MERGER_OUT], true)) {
             if (!$this->isSignedDecimal($data['quantity']) || DecimalMath::cmp($quantity, DecimalMath::zero()) === 0) {
-                $errors[] = 'quantity must be a non-zero decimal for stock splits.';
+                $errors[] = 'quantity must be a non-zero decimal for stock splits and stock mergers.';
             }
         } elseif (!$this->isDecimal($data['quantity']) || DecimalMath::cmp($data['quantity'], '0.00000000') <= 0) {
-            $errors[] = 'quantity must be a positive decimal.';
+            if ($type !== Transaction::TYPE_MERGER_CASH) {
+                $errors[] = 'quantity must be a positive decimal.';
+            }
         }
 
         $price = '';
         $priceCurrency = '';
-        if ($type === Transaction::TYPE_STOCK_SPLIT && $data['price per share'] === '') {
+        if (in_array($type, [
+            Transaction::TYPE_STOCK_SPLIT,
+            Transaction::TYPE_MERGER_IN,
+            Transaction::TYPE_MERGER_OUT,
+            Transaction::TYPE_MERGER_CASH,
+        ], true) && $data['price per share'] === '') {
             $price = DecimalMath::zero();
         } elseif (preg_match('/^([A-Z]{3})\s+(\d+(?:\.\d+)?)$/i', $data['price per share'], $matches) === 1) {
             $priceCurrency = strtoupper($matches[1]);
@@ -433,12 +462,23 @@ final class CsvTransactionParser
             $errors[] = 'price per share must use format "USD 50.56".';
         }
 
-        $currency = strtoupper($data['currency']);
-        if ($currency !== 'USD') {
+        $csvCurrency = strtoupper($data['currency']);
+        if ($csvCurrency !== 'USD') {
             $errors[] = 'currency must be USD.';
         }
 
-        return [[
+        $brokerCurrency = null;
+        $brokerAmount = null;
+        if ($type !== Transaction::TYPE_STOCK_SPLIT && array_key_exists('total amount', $data)) {
+            [$brokerCurrency, $brokerAmount] = $this->parseCurrencyAmount($data['total amount']);
+            if ($brokerCurrency === null || $brokerAmount === null) {
+                $errors[] = 'total amount must use format "USD 101.12".';
+            }
+        }
+
+        $currency = $priceCurrency !== '' ? $priceCurrency : $csvCurrency;
+
+        $normalized = [
             'date' => $date?->format('Y-m-d') ?? $data['date'],
             'transactionDate' => $date?->format('Y-m-d H:i:s') ?? $data['date'],
             'symbol' => $symbol,
@@ -447,7 +487,100 @@ final class CsvTransactionParser
             'price' => $price,
             'currency' => $currency,
             'fees' => '0.00000000',
-        ], $errors];
+        ];
+
+        if ($brokerCurrency !== null && $brokerAmount !== null) {
+            $normalized['brokerAmount'] = $brokerAmount;
+            $normalized['brokerCurrency'] = $brokerCurrency;
+        }
+
+        return [$normalized, $errors];
+    }
+
+    private function mergerStockType(string $quantity): ?string
+    {
+        if (!$this->isSignedDecimal($quantity)) {
+            return null;
+        }
+
+        return match (DecimalMath::cmp($quantity, DecimalMath::zero())) {
+            1 => Transaction::TYPE_MERGER_IN,
+            -1 => Transaction::TYPE_MERGER_OUT,
+            default => null,
+        };
+    }
+
+    /**
+     * @param list<ParsedCsvRow> $rows
+     * @return list<ParsedCsvRow>
+     */
+    private function linkRevolutMergerRows(array $rows): array
+    {
+        $mergerIndexes = [];
+        $mergerTimestamp = null;
+
+        $flush = function () use (&$rows, &$mergerIndexes, &$mergerTimestamp): void {
+            if ($mergerIndexes === []) {
+                return;
+            }
+
+            $stockInCount = 0;
+            $stockOutCount = 0;
+            foreach ($mergerIndexes as $index) {
+                $stockInCount += ($rows[$index]->data['type'] ?? null) === Transaction::TYPE_MERGER_IN ? 1 : 0;
+                $stockOutCount += ($rows[$index]->data['type'] ?? null) === Transaction::TYPE_MERGER_OUT ? 1 : 0;
+            }
+
+            $groupIsValid = $stockInCount === 1 && $stockOutCount === 1;
+            $signature = implode('|', array_map(
+                static fn (int $index): string => implode(':', [
+                    (string) $rows[$index]->rowNumber,
+                    $rows[$index]->data['transactionDate'] ?? '',
+                    $rows[$index]->data['symbol'] ?? '',
+                    $rows[$index]->data['type'] ?? '',
+                    $rows[$index]->data['quantity'] ?? '',
+                ]),
+                $mergerIndexes,
+            ));
+            $group = 'revolut-'.substr(hash('sha256', $signature), 0, 32);
+
+            foreach ($mergerIndexes as $index) {
+                $data = $rows[$index]->data;
+                $errors = $rows[$index]->errors;
+                if ($groupIsValid) {
+                    $data['corporateActionGroup'] = $group;
+                } else {
+                    $errors[] = 'merger rows must contain one positive and one negative MERGER - STOCK quantity.';
+                }
+
+                $rows[$index] = new ParsedCsvRow($rows[$index]->rowNumber, $data, $errors);
+            }
+
+            $mergerIndexes = [];
+            $mergerTimestamp = null;
+        };
+
+        foreach ($rows as $index => $row) {
+            if (in_array($row->data['type'] ?? null, [
+                Transaction::TYPE_MERGER_IN,
+                Transaction::TYPE_MERGER_OUT,
+                Transaction::TYPE_MERGER_CASH,
+            ], true)) {
+                $timestamp = $row->data['transactionDate'] ?? null;
+                if ($mergerIndexes !== [] && $timestamp !== $mergerTimestamp) {
+                    $flush();
+                }
+
+                $mergerTimestamp = $timestamp;
+                $mergerIndexes[] = $index;
+                continue;
+            }
+
+            $flush();
+        }
+        $flush();
+
+        return $rows;
     }
 
     private function parseXtbDate(string $value): ?\DateTimeImmutable
@@ -562,5 +695,22 @@ final class CsvTransactionParser
         }
 
         return DecimalMath::normalize(ltrim($value, '-'));
+    }
+
+    /**
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function parseCurrencyAmount(string $value): array
+    {
+        if (preg_match('/^([A-Z]{3})\s+(.+)$/i', trim($value), $matches) !== 1) {
+            return [null, null];
+        }
+
+        $amount = $this->normalizeAbsoluteDecimal($matches[2]);
+        if ($amount === null) {
+            return [null, null];
+        }
+
+        return [strtoupper($matches[1]), $amount];
     }
 }

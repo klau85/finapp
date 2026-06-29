@@ -124,6 +124,11 @@ class PositionLot
         return $this->feesAllocated;
     }
 
+    public function getOpenedAt(): \DateTimeImmutable
+    {
+        return $this->openedAt;
+    }
+
     public function setQuantityOriginal(string $quantityOriginal): self
     {
         $this->quantityOriginal = $quantityOriginal;

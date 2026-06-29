@@ -15,12 +15,23 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['stock_id'], name: 'idx_transaction_stock')]
 #[ORM\Index(columns: ['transaction_date'], name: 'idx_transaction_date')]
 #[ORM\Index(columns: ['type'], name: 'idx_transaction_type')]
+#[ORM\Index(columns: ['corporate_action_group'], name: 'idx_transaction_corporate_action_group')]
 class Transaction
 {
     public const TYPE_BUY = 'BUY';
     public const TYPE_SELL = 'SELL';
     public const TYPE_STOCK_SPLIT = 'STOCK_SPLIT';
-    public const TYPES = [self::TYPE_BUY, self::TYPE_SELL, self::TYPE_STOCK_SPLIT];
+    public const TYPE_MERGER_IN = 'MERGER_IN';
+    public const TYPE_MERGER_OUT = 'MERGER_OUT';
+    public const TYPE_MERGER_CASH = 'MERGER_CASH';
+    public const TYPES = [
+        self::TYPE_BUY,
+        self::TYPE_SELL,
+        self::TYPE_STOCK_SPLIT,
+        self::TYPE_MERGER_IN,
+        self::TYPE_MERGER_OUT,
+        self::TYPE_MERGER_CASH,
+    ];
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -66,6 +77,9 @@ class Transaction
 
     #[ORM\Column(length: 3, nullable: true)]
     private ?string $brokerCurrency = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $corporateActionGroup = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $notes = null;
@@ -220,6 +234,18 @@ class Transaction
     public function setBrokerCurrency(?string $brokerCurrency): self
     {
         $this->brokerCurrency = $brokerCurrency !== null ? strtoupper($brokerCurrency) : null;
+
+        return $this;
+    }
+
+    public function getCorporateActionGroup(): ?string
+    {
+        return $this->corporateActionGroup;
+    }
+
+    public function setCorporateActionGroup(?string $corporateActionGroup): self
+    {
+        $this->corporateActionGroup = $corporateActionGroup;
 
         return $this;
     }

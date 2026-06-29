@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\BrokerAccount;
 use App\Entity\PositionLot;
 use App\Entity\RealizedTrade;
+use App\Entity\Stock;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Exception\InsufficientSharesForSellException;
@@ -38,17 +39,9 @@ final readonly class PortfolioAnalyticsService
             $this->positionLotRepository->deleteForUser($user);
             $this->entityManager->flush();
 
-            /** @var array<string, list<Transaction>> $transactionGroups */
-            $transactionGroups = [];
-            foreach ($this->transactionRepository->findForFifoRecalculation($user) as $transaction) {
-                $brokerAccount = $transaction->getBrokerAccount();
-                $stock = $transaction->getStock();
-                if ($brokerAccount === null || $stock === null) {
-                    continue;
-                }
-
-                $transactionGroups[$this->fifoKey($transaction)][] = $transaction;
-            }
+            $transactionGroups = $this->groupTransactionsForFifo(
+                $this->transactionRepository->findForFifoRecalculation($user),
+            );
 
             $warnings = [];
             foreach ($transactionGroups as $transactions) {
@@ -269,7 +262,7 @@ final readonly class PortfolioAnalyticsService
                 'remainingCostBasis' => DecimalMath::zero(),
             ];
 
-            $remainingRatio = DecimalMath::div($lot->getQuantityRemaining(), $buyTransaction->getQuantity());
+            $remainingRatio = DecimalMath::div($lot->getQuantityRemaining(), $lot->getQuantityOriginal());
             $remainingBuyCost = DecimalMath::mul($lot->getQuantityRemaining(), $lot->getPrice());
             $remainingFees = DecimalMath::mul($lot->getFeesAllocated(), $remainingRatio);
 
@@ -320,6 +313,14 @@ final readonly class PortfolioAnalyticsService
     {
         $lots = [];
         $realizedTrades = [];
+        $mergerTransactions = [];
+        foreach ($transactions as $transaction) {
+            $group = $transaction->getCorporateActionGroup();
+            if ($group !== null && $this->isMergerTransaction($transaction)) {
+                $mergerTransactions[$group][] = $transaction;
+            }
+        }
+        $processedMergers = [];
 
         foreach ($transactions as $transaction) {
             $brokerAccount = $transaction->getBrokerAccount();
@@ -349,6 +350,18 @@ final readonly class PortfolioAnalyticsService
                 continue;
             }
 
+            if ($this->isMergerTransaction($transaction)) {
+                $group = $transaction->getCorporateActionGroup();
+                if ($group === null || isset($processedMergers[$group])) {
+                    continue;
+                }
+
+                $this->processMerger($user, $mergerTransactions[$group] ?? [], $lots);
+                $processedMergers[$group] = true;
+
+                continue;
+            }
+
             $this->processSell($user, $transaction, $lots, $realizedTrades);
         }
 
@@ -368,7 +381,8 @@ final readonly class PortfolioAnalyticsService
 
         $currentShares = DecimalMath::zero();
         foreach ($lots as $lot) {
-            if (DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0) {
+            if ($this->sameStock($lot->getStock(), $stock)
+                && DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0) {
                 $currentShares = DecimalMath::add($currentShares, $lot->getQuantityRemaining());
             }
         }
@@ -385,13 +399,15 @@ final readonly class PortfolioAnalyticsService
         $factor = DecimalMath::div($newShares, $currentShares);
         $openLotIndexes = array_keys(array_filter(
             $lots,
-            static fn (PositionLot $lot): bool => DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0,
+            fn (PositionLot $lot): bool => $this->sameStock($lot->getStock(), $stock)
+                && DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0,
         ));
         $lastOpenLotIndex = $openLotIndexes[array_key_last($openLotIndexes)] ?? null;
         $adjustedShares = DecimalMath::zero();
 
         foreach ($lots as $index => $lot) {
-            if (DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
+            if (!$this->sameStock($lot->getStock(), $stock)
+                || DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
                 continue;
             }
 
@@ -407,6 +423,110 @@ final readonly class PortfolioAnalyticsService
                 ->setQuantityRemaining($newRemainingQuantity)
                 ->setPrice(DecimalMath::div($oldRemainingCostBasis, $newRemainingQuantity));
         }
+    }
+
+    /**
+     * @param list<Transaction> $transactions
+     * @param list<PositionLot> $lots
+     */
+    private function processMerger(User $user, array $transactions, array &$lots): void
+    {
+        $stockInTransaction = null;
+        $stockOutTransaction = null;
+
+        foreach ($transactions as $transaction) {
+            if ($transaction->getType() === Transaction::TYPE_MERGER_IN) {
+                $stockInTransaction = $transaction;
+            } elseif ($transaction->getType() === Transaction::TYPE_MERGER_OUT) {
+                $stockOutTransaction = $transaction;
+            }
+        }
+
+        $brokerAccount = $stockOutTransaction?->getBrokerAccount();
+        $sourceStock = $stockOutTransaction?->getStock();
+        $targetStock = $stockInTransaction?->getStock();
+        if ($stockInTransaction === null || $stockOutTransaction === null
+            || $brokerAccount === null || $sourceStock === null || $targetStock === null
+            || $stockInTransaction->getBrokerAccount() !== $brokerAccount) {
+            throw new InsufficientSharesForSellException('A stock merger could not be calculated because its linked transactions are incomplete.');
+        }
+
+        $sourceQuantity = ltrim($stockOutTransaction->getQuantity(), '-');
+        $targetQuantity = $stockInTransaction->getQuantity();
+        if (DecimalMath::cmp($sourceQuantity, DecimalMath::zero()) <= 0
+            || DecimalMath::cmp($targetQuantity, DecimalMath::zero()) <= 0) {
+            throw new InsufficientSharesForSellException(sprintf(
+                '%s to %s merger could not be calculated because its share quantities are invalid.',
+                $sourceStock->getSymbol(),
+                $targetStock->getSymbol(),
+            ));
+        }
+
+        $availableShares = DecimalMath::zero();
+        foreach ($lots as $lot) {
+            if ($this->sameStock($lot->getStock(), $sourceStock)
+                && DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) > 0) {
+                $availableShares = DecimalMath::add($availableShares, $lot->getQuantityRemaining());
+            }
+        }
+
+        if (DecimalMath::cmp($availableShares, $sourceQuantity) < 0) {
+            throw new InsufficientSharesForSellException(sprintf(
+                '%s to %s merger could not be calculated in %s because %s source shares are missing.',
+                $sourceStock->getSymbol(),
+                $targetStock->getSymbol(),
+                $brokerAccount->getDisplayName(),
+                DecimalMath::sub($sourceQuantity, $availableShares),
+            ));
+        }
+
+        $remainingSourceQuantity = $sourceQuantity;
+        $allocatedTargetQuantity = DecimalMath::zero();
+        $newLots = [];
+
+        foreach ($lots as $lot) {
+            if (DecimalMath::cmp($remainingSourceQuantity, DecimalMath::zero()) <= 0) {
+                break;
+            }
+
+            if (!$this->sameStock($lot->getStock(), $sourceStock)
+                || DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
+                continue;
+            }
+
+            $oldRemainingQuantity = $lot->getQuantityRemaining();
+            $transferredSourceQuantity = DecimalMath::cmp($oldRemainingQuantity, $remainingSourceQuantity) <= 0
+                ? $oldRemainingQuantity
+                : $remainingSourceQuantity;
+            $isLastTransfer = DecimalMath::cmp($transferredSourceQuantity, $remainingSourceQuantity) === 0;
+            $transferredTargetQuantity = $isLastTransfer
+                ? DecimalMath::sub($targetQuantity, $allocatedTargetQuantity)
+                : DecimalMath::mul($targetQuantity, DecimalMath::div($transferredSourceQuantity, $sourceQuantity));
+            $transferredCostBasis = DecimalMath::mul($transferredSourceQuantity, $lot->getPrice());
+            $transferredFees = DecimalMath::mul(
+                $lot->getFeesAllocated(),
+                DecimalMath::div($transferredSourceQuantity, $oldRemainingQuantity),
+            );
+
+            $newLots[] = (new PositionLot())
+                ->setUser($user)
+                ->setBrokerAccount($brokerAccount)
+                ->setStock($targetStock)
+                ->setBuyTransaction($stockInTransaction)
+                ->setQuantityOriginal($transferredTargetQuantity)
+                ->setQuantityRemaining($transferredTargetQuantity)
+                ->setPrice(DecimalMath::div($transferredCostBasis, $transferredTargetQuantity))
+                ->setFeesAllocated($transferredFees)
+                ->setOpenedAt($lot->getOpenedAt());
+
+            $lot
+                ->setQuantityRemaining(DecimalMath::sub($oldRemainingQuantity, $transferredSourceQuantity))
+                ->setFeesAllocated(DecimalMath::sub($lot->getFeesAllocated(), $transferredFees));
+            $remainingSourceQuantity = DecimalMath::sub($remainingSourceQuantity, $transferredSourceQuantity);
+            $allocatedTargetQuantity = DecimalMath::add($allocatedTargetQuantity, $transferredTargetQuantity);
+        }
+
+        array_push($lots, ...$newLots);
     }
 
     /**
@@ -428,7 +548,8 @@ final readonly class PortfolioAnalyticsService
                 break;
             }
 
-            if (DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
+            if (!$this->sameStock($lot->getStock(), $stock)
+                || DecimalMath::cmp($lot->getQuantityRemaining(), DecimalMath::zero()) <= 0) {
                 continue;
             }
 
@@ -445,7 +566,7 @@ final readonly class PortfolioAnalyticsService
                 $lot->getFeesAllocated(),
                 DecimalMath::div($matchedQuantity, $lot->getQuantityRemaining())
             );
-            $realizedTrades[] = $this->createRealizedTrade($user, $buyTransaction, $sellTransaction, $matchedQuantity, $buyFeePart);
+            $realizedTrades[] = $this->createRealizedTrade($user, $lot, $buyTransaction, $sellTransaction, $matchedQuantity, $buyFeePart);
 
             $lot->setQuantityRemaining(DecimalMath::sub($lot->getQuantityRemaining(), $matchedQuantity));
             $lot->setFeesAllocated(DecimalMath::sub($lot->getFeesAllocated(), $buyFeePart));
@@ -464,6 +585,7 @@ final readonly class PortfolioAnalyticsService
 
     private function createRealizedTrade(
         User $user,
+        PositionLot $lot,
         Transaction $buyTransaction,
         Transaction $sellTransaction,
         string $matchedQuantity,
@@ -479,12 +601,12 @@ final readonly class PortfolioAnalyticsService
         );
         $allocatedFees = DecimalMath::add($buyFeePart, $sellFeePart);
         $profit = DecimalMath::sub(
-            DecimalMath::mul(DecimalMath::sub($sellTransaction->getPrice(), $buyTransaction->getPrice()), $matchedQuantity),
+            DecimalMath::mul(DecimalMath::sub($sellTransaction->getPrice(), $lot->getPrice()), $matchedQuantity),
             $allocatedFees
         );
-        $profitBase = DecimalMath::add(DecimalMath::mul($matchedQuantity, $buyTransaction->getPrice()), $buyFeePart);
+        $profitBase = DecimalMath::add(DecimalMath::mul($matchedQuantity, $lot->getPrice()), $buyFeePart);
         $profitPercent = DecimalMath::mul(DecimalMath::div($profit, $profitBase, 10), '100', 4);
-        $holdingDays = (int) $buyTransaction->getTransactionDate()
+        $holdingDays = (int) $lot->getOpenedAt()
             ->diff($sellTransaction->getTransactionDate())
             ->format('%r%a');
 
@@ -495,18 +617,96 @@ final readonly class PortfolioAnalyticsService
             ->setBuyTransaction($buyTransaction)
             ->setSellTransaction($sellTransaction)
             ->setQuantity($matchedQuantity)
-            ->setBuyPrice($buyTransaction->getPrice())
+            ->setBuyPrice($lot->getPrice())
             ->setSellPrice($sellTransaction->getPrice())
             ->setFeesAllocated($allocatedFees)
             ->setProfit($profit)
             ->setProfitPercent($profitPercent)
             ->setHoldingDays($holdingDays)
-            ->setOpenedAt($buyTransaction->getTransactionDate())
+            ->setOpenedAt($lot->getOpenedAt())
             ->setClosedAt($sellTransaction->getTransactionDate());
+    }
+
+    private function isMergerTransaction(Transaction $transaction): bool
+    {
+        return in_array($transaction->getType(), [
+            Transaction::TYPE_MERGER_IN,
+            Transaction::TYPE_MERGER_OUT,
+            Transaction::TYPE_MERGER_CASH,
+        ], true);
+    }
+
+    private function sameStock(?Stock $left, Stock $right): bool
+    {
+        if ($left === null) {
+            return false;
+        }
+
+        if ($left === $right) {
+            return true;
+        }
+
+        return $left->getId() !== null && $left->getId() === $right->getId();
+    }
+
+    /**
+     * @param list<Transaction> $transactions
+     * @return array<string, list<Transaction>>
+     */
+    private function groupTransactionsForFifo(array $transactions): array
+    {
+        $parents = [];
+        foreach ($transactions as $transaction) {
+            $key = $this->fifoKey($transaction);
+            $parents[$key] = $key;
+        }
+
+        $find = function (string $key) use (&$parents, &$find): string {
+            if ($parents[$key] !== $key) {
+                $parents[$key] = $find($parents[$key]);
+            }
+
+            return $parents[$key];
+        };
+        $union = function (string $left, string $right) use (&$parents, $find): void {
+            $leftRoot = $find($left);
+            $rightRoot = $find($right);
+            if ($leftRoot !== $rightRoot) {
+                $parents[$rightRoot] = $leftRoot;
+            }
+        };
+
+        $firstStockByCorporateAction = [];
+        foreach ($transactions as $transaction) {
+            $group = $transaction->getCorporateActionGroup();
+            if ($group === null || !$this->isMergerTransaction($transaction)) {
+                continue;
+            }
+
+            $corporateActionKey = ($transaction->getBrokerAccount()?->getId() ?? 0).':'.$group;
+            $stockKey = $this->fifoKey($transaction);
+            if (isset($firstStockByCorporateAction[$corporateActionKey])) {
+                $union($firstStockByCorporateAction[$corporateActionKey], $stockKey);
+            } else {
+                $firstStockByCorporateAction[$corporateActionKey] = $stockKey;
+            }
+        }
+
+        $groups = [];
+        foreach ($transactions as $transaction) {
+            $groups[$find($this->fifoKey($transaction))][] = $transaction;
+        }
+
+        return $groups;
     }
 
     private function fifoKey(Transaction $transaction): string
     {
-        return ($transaction->getBrokerAccount()?->getId() ?? 0).':'.($transaction->getStock()?->getId() ?? 0);
+        $brokerAccount = $transaction->getBrokerAccount();
+        $stock = $transaction->getStock();
+        $brokerAccountKey = $brokerAccount?->getId() ?? ($brokerAccount !== null ? 'new-'.spl_object_id($brokerAccount) : 'missing');
+        $stockKey = $stock?->getId() ?? ($stock !== null ? 'new-'.spl_object_id($stock) : 'missing');
+
+        return $brokerAccountKey.':'.$stockKey;
     }
 }

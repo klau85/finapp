@@ -179,7 +179,8 @@ class TransactionUploadController extends AbstractController
                     ->setCurrency($data['currency'])
                     ->setFees($data['fees'])
                     ->setBrokerAmount($data['brokerAmount'] ?? null)
-                    ->setBrokerCurrency($data['brokerCurrency'] ?? null);
+                    ->setBrokerCurrency($data['brokerCurrency'] ?? null)
+                    ->setCorporateActionGroup($data['corporateActionGroup'] ?? null);
 
                 $entityManager->persist($transaction);
                 ++$importedCount;

@@ -67,6 +67,7 @@
                                         <th>currency</th>
                                         <th>fees</th>
                                         <th>amount</th>
+                                        <th>amount currency</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -79,6 +80,7 @@
                                         <td>USD</td>
                                         <td>1.00</td>
                                         <td>17842.88</td>
+                                        <td>EUR</td>
                                     </tr>
                                     <tr>
                                         <td>2026-03-13</td>
@@ -89,15 +91,16 @@
                                         <td>USD</td>
                                         <td>0.00</td>
                                         <td>22909.38</td>
+                                        <td>EUR</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                         <p class="text-secondary mb-0">Transactions are imported into the selected broker account only.<br>
                             Custom CSV import supports USD only; rows with another currency are marked invalid and skipped.<br>
-                            The optional amount column is saved as the broker amount in the selected broker account currency. <br>
-                            In the example above the stock currency is USD and the price is in USD.
-                            The selected broker account currency is EUR, so the amount is in EUR.</p>
+                            The optional amount column is saved as the broker amount. The optional amount currency overrides the selected broker account currency.<br>
+                            When amount currency is empty or omitted, the selected broker account currency is used.<br>
+                            In the example above the stock price is in USD and the explicit amount currency is EUR.</p>
                     </div>
 
                     <div data-import-format="xtb" hidden>
@@ -132,7 +135,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-secondary mb-0">XTB imports save the Comment price as USD for .US or no-suffix tickers.<br>
+                        <p class="text-secondary mb-0">XTB imports infer the price currency from the ticker suffix; .US and no-suffix tickers use USD.<br>
                             The absolute Amount value is saved separately in the selected broker account currency.<br>
                             Non-US ticker suffixes are marked invalid and skipped.
                         </p>
@@ -150,6 +153,7 @@
                                         <th>Type</th>
                                         <th>Quantity</th>
                                         <th>Price per share</th>
+                                        <th>Total Amount</th>
                                         <th>Currency</th>
                                     </tr>
                                 </thead>
@@ -160,6 +164,7 @@
                                         <td>BUY - MARKET</td>
                                         <td>2</td>
                                         <td>USD 50.56</td>
+                                        <td>EUR 92.40</td>
                                         <td>USD</td>
                                     </tr>
                                     <tr>
@@ -168,6 +173,7 @@
                                         <td>SELL - MARKET</td>
                                         <td>1</td>
                                         <td>USD 151.20</td>
+                                        <td>EUR 138.25</td>
                                         <td>USD</td>
                                     </tr>
                                     <tr>
@@ -176,14 +182,44 @@
                                         <td>STOCK SPLIT</td>
                                         <td>-5.70525065</td>
                                         <td></td>
+                                        <td>USD 0</td>
+                                        <td>USD</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2025-03-04T12:54:42.332520Z</td>
+                                        <td>MTTR</td>
+                                        <td>MERGER - CASH</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td>USD 5.50</td>
+                                        <td>USD</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2025-03-04T12:54:42.742284Z</td>
+                                        <td>CSGP</td>
+                                        <td>MERGER - STOCK</td>
+                                        <td>0.07104</td>
+                                        <td></td>
+                                        <td>USD 0</td>
+                                        <td>USD</td>
+                                    </tr>
+                                    <tr>
+                                        <td>2025-03-04T12:54:42.780011Z</td>
+                                        <td>MTTR</td>
+                                        <td>MERGER - STOCK</td>
+                                        <td>-2</td>
+                                        <td></td>
+                                        <td>USD 0</td>
                                         <td>USD</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-secondary mb-0">Revolut imports support BUY - MARKET, SELL - MARKET, and STOCK SPLIT rows.<br>
+                        <p class="text-secondary mb-0">Revolut imports support BUY - MARKET, SELL - MARKET, STOCK SPLIT, MERGER - STOCK, and MERGER - CASH rows.<br>
                             Stock split rows adjust open FIFO lots and preserve the current cost basis.<br>
-                            Rows with empty or non-US tickers, non-USD prices, or non-USD currency are marked invalid and skipped.
+                            Linked merger rows transfer the source stock's open FIFO cost basis and holding dates to the received stock. Merger cash is recorded without changing stock gains.<br>
+                            Price per share provides the transaction price and currency. Total Amount provides the broker amount and its currency.<br>
+                            Total Amount may use another ISO currency. Rows with empty or non-US tickers, non-USD prices, or a non-USD Currency value are marked invalid and skipped.
                         </p>
                     </div>
                 </div>
