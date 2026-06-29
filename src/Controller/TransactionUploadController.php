@@ -160,8 +160,7 @@ class TransactionUploadController extends AbstractController
                 if (!$stock instanceof Stock) {
                     $stock = (new Stock())
                         ->setSymbol($data['symbol'])
-                        ->setCurrency($data['currency'])
-                        ->setCompanyName($data['symbol']);
+                        ->setCurrency($data['currency']);
                     $entityManager->persist($stock);
                 }
                 $stockCache[$stockKey] = $stock;

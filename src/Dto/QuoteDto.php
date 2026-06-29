@@ -14,6 +14,7 @@ final readonly class QuoteDto
         public ?string $currency,
         public ?\DateTimeImmutable $marketTime,
         public string $provider,
+        public ?string $companyName = null,
     ) {
     }
 }

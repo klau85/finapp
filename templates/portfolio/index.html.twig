@@ -170,11 +170,14 @@
                         <div class="portfolio-exposure-legend-scroll">
                             <div id="portfolio-exposure-legend" class="portfolio-exposure-legend">
                                 {% for item in exposure %}
+                                    {% set companyLabel = item.companyName ?: item.symbol %}
                                     <div class="portfolio-exposure-item">
                                         <span class="portfolio-exposure-swatch" data-exposure-swatch="{{ loop.index0 }}"></span>
                                         <div class="min-w-0">
                                             <div class="fw-semibold text-truncate">{{ item.symbol }}</div>
-                                            <div class="small text-secondary text-truncate">{{ item.companyName ?: 'Company name not available' }}</div>
+                                            <div class="small text-secondary text-truncate" title="{{ companyLabel }}">
+                                                {{ companyLabel|length > 10 ? companyLabel|slice(0, 10) ~ '...' : companyLabel }}
+                                            </div>
                                         </div>
                                         <div>
                                             <div class="fw-semibold">{{ item.percent|trim_number }}%</div>

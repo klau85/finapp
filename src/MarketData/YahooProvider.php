@@ -171,6 +171,7 @@ final readonly class YahooProvider implements MarketDataProviderInterface, Batch
             $quote->getCurrency() ?? $stock->getCurrency(),
             $marketTime !== null ? \DateTimeImmutable::createFromInterface($marketTime)->setTimezone(new \DateTimeZone('UTC')) : null,
             self::PROVIDER,
+            $quote->getShortName(),
         );
     }
 

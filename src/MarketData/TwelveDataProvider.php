@@ -161,6 +161,7 @@ final readonly class TwelveDataProvider implements MarketDataProviderInterface
             isset($data['currency']) && is_string($data['currency']) && $data['currency'] !== '' ? $data['currency'] : $stock->getCurrency(),
             $marketTime,
             self::PROVIDER,
+            isset($data['name']) && is_string($data['name']) ? $data['name'] : null,
         );
     }
 

@@ -52,7 +52,11 @@ final class MarketDataManager
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $freshAfter = $now->modify(sprintf('-%d minutes', $this->currentQuoteTtlMinutes($now)));
 
-        if ($cached !== null && $cached->getFetchedAt() >= $freshAfter) {
+        if (
+            $cached !== null
+            && $cached->getFetchedAt() >= $freshAfter
+            && $this->hasResolvedCompanyName($stock)
+        ) {
             return $this->quoteFromEntity($cached);
         }
 
@@ -101,7 +105,7 @@ final class MarketDataManager
 
         foreach ($this->uniqueStocksBySymbol($stocks) as $symbol => $stock) {
             $cached = $this->stockQuoteRepository->findLatestForStock($stock);
-            if ($cached !== null && $cached->getFetchedAt() >= $freshAfter) {
+            if ($cached !== null && $cached->getFetchedAt() >= $freshAfter && $this->hasResolvedCompanyName($stock)) {
                 $quotes[$symbol] = $this->quoteFromEntity($cached);
                 continue;
             }
@@ -475,6 +479,8 @@ final class MarketDataManager
 
     private function storeQuote(Stock $stock, QuoteDto $quote, \DateTimeImmutable $now): void
     {
+        $this->updateCompanyName($stock, $quote);
+
         $entity = (new StockQuote())
             ->setStock($stock)
             ->setPrice($quote->price)
@@ -501,6 +507,8 @@ final class MarketDataManager
             if ($stock === null) {
                 continue;
             }
+
+            $this->updateCompanyName($stock, $quote);
 
             $entity = (new StockQuote())
                 ->setStock($stock)
@@ -590,7 +598,23 @@ final class MarketDataManager
             $quote->getCurrency(),
             $quote->getMarketTime(),
             $quote->getProvider(),
+            $stock->getCompanyName(),
         );
+    }
+
+    private function updateCompanyName(Stock $stock, QuoteDto $quote): void
+    {
+        $companyName = trim($quote->companyName ?? '');
+        if ($companyName !== '' && !$this->hasResolvedCompanyName($stock)) {
+            $stock->setCompanyName($companyName);
+        }
+    }
+
+    private function hasResolvedCompanyName(Stock $stock): bool
+    {
+        $companyName = trim($stock->getCompanyName() ?? '');
+
+        return $companyName !== '' && strcasecmp($companyName, $stock->getSymbol()) !== 0;
     }
 
     private function ohlcFromEntity(StockPrice $price): OhlcDto
