@@ -217,6 +217,7 @@ final class MarketDataManager
         }
 
         $fetchFrom = $latest !== null ? $latest->getDate() : $from;
+        $providerEndDate = $latestRequiredMarketDay->modify('+1 day');
         $providerException = null;
         foreach ($this->ohlcProviders($stock) as $provider) {
             if (!$this->reserveApiRequest($stock, $provider, 'ohlc')) {
@@ -224,7 +225,7 @@ final class MarketDataManager
             }
 
             try {
-                $candles = $provider->getDailyOhlc($stock, $fetchFrom, $latestRequiredMarketDay);
+                $candles = $provider->getDailyOhlc($stock, $fetchFrom, $providerEndDate);
                 $this->storeCandles($stock, $candles, $now);
 
                 return array_map(
