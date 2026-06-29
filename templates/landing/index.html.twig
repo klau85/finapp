@@ -1,0 +1,366 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}FinApp | Understand Your Portfolio{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/landing.css') }}">
+{% endblock %}
+
+{% block body %}
+    <div class="landing-page">
+        <header class="landing-header sticky-top">
+            <nav class="navbar navbar-expand-lg" aria-label="Main navigation">
+                <div class="container landing-container">
+                    <a class="navbar-brand landing-brand" href="{{ path('app_home') }}" aria-label="FinApp home">
+                        <span class="landing-brand-mark" aria-hidden="true"><span></span></span>
+                        FinApp
+                    </a>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#landingNavbar" aria-controls="landingNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="landingNavbar">
+                        <ul class="navbar-nav mx-auto gap-lg-2">
+                            <li class="nav-item"><a class="nav-link" href="#features">Features</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#how-it-works">How it works</a></li>
+                            <li class="nav-item"><a class="nav-link" href="#roadmap">Roadmap</a></li>
+                        </ul>
+                        <div class="landing-nav-actions d-flex flex-column flex-lg-row gap-2">
+                            {% if app.user %}
+                                <a class="btn btn-dark" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
+                            {% else %}
+                                <a class="btn btn-link landing-login" href="{{ path('app_login') }}">Login</a>
+                                <a class="btn btn-dark" href="{{ path('app_register') }}">Create Free Account</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <section class="landing-hero">
+                <div class="container landing-container text-center">
+                    <div class="landing-eyebrow">Good investing starts with understanding your portfolio.</div>
+                    <h1>Understand your portfolio.</h1>
+                    <p class="landing-hero-lead">Not just what you own. Understand your exposure, performance, brokers, and every decision behind your investments.</p>
+                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-3 landing-hero-actions">
+                        {% if app.user %}
+                            <a class="btn btn-success btn-lg" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
+                        {% else %}
+                            <a class="btn btn-success btn-lg" href="{{ path('app_register') }}">Create Free Account</a>
+                        {% endif %}
+                    </div>
+                    <div class="landing-hero-note">Built for investors who want clarity, not noise.</div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-problem" id="features">
+                <div class="container landing-container">
+                    <div class="landing-section-heading">
+                        <span class="landing-kicker">The real question</span>
+                        <h2>You know your balance. But do you understand your portfolio?</h2>
+                    </div>
+                    <div class="landing-question-grid">
+                        {% for question in [
+                            'How much capital is actually invested?',
+                            'Which stocks drive most of your gains or losses?',
+                            'How concentrated is your portfolio?',
+                            'Which broker account performs best?',
+                            'Where did each buy and sell decision happen?'
+                        ] %}
+                            <div class="landing-question">
+                                <span aria-hidden="true">{{ loop.index < 10 ? '0' ~ loop.index : loop.index }}</span>
+                                <p>{{ question }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-values">
+                <div class="container landing-container">
+                    <div class="landing-section-heading text-center mx-auto">
+                        <span class="landing-kicker">A clearer practice</span>
+                        <h2>Good investing starts with understanding.</h2>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <article class="landing-value-card h-100">
+                                <div class="landing-card-index">01</div>
+                                <h3>Know your portfolio</h3>
+                                <p>Every position. Every broker account. One clear view of your exposure, cost basis, and performance.</p>
+                            </article>
+                        </div>
+                        <div class="col-md-4">
+                            <article class="landing-value-card h-100">
+                                <div class="landing-card-index">02</div>
+                                <h3>Learn from your decisions</h3>
+                                <p>Every buy and sell tells a story. See transactions directly on the stock chart and review what happened.</p>
+                            </article>
+                        </div>
+                        <div class="col-md-4">
+                            <article class="landing-value-card h-100">
+                                <div class="landing-card-index">03</div>
+                                <h3>Improve over time</h3>
+                                <p>The goal is not more trades. The goal is better decisions backed by clearer data.</p>
+                            </article>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-preview-section" id="preview">
+                <div class="container landing-container">
+                    <div class="landing-section-heading">
+                        <span class="landing-kicker">Portfolio overview</span>
+                        <h2>Everything important, in one place.</h2>
+                    </div>
+
+                    <div class="landing-product-preview" aria-label="Example portfolio dashboard">
+                        <div class="landing-preview-toolbar">
+                            <div>
+                                <div class="landing-preview-brand">FinApp</div>
+                                <div class="landing-preview-date">Portfolio overview &middot; June 2026</div>
+                            </div>
+                            <div class="landing-preview-avatar">AC</div>
+                        </div>
+
+                        <div class="landing-preview-metrics">
+                            <div class="landing-preview-panel">
+                                <span>Portfolio Value</span>
+                                <strong>$39.182,40</strong>
+                            </div>
+                            <div class="landing-preview-panel">
+                                <span>Invested Capital</span>
+                                <strong>$26.747,07</strong>
+                                <small>Open FIFO cost basis</small>
+                            </div>
+                            <div class="landing-preview-panel">
+                                <span>Unrealized P/L</span>
+                                <strong class="landing-up">$15.595,02</strong>
+                            </div>
+                            <div class="landing-preview-panel landing-exposure-summary">
+                                <span>Total P/L</span>
+                                <strong>$18.858,65</strong>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 landing-preview-main">
+                            <div class="col-lg-8">
+                                <div class="landing-preview-panel landing-chart-panel h-100">
+                                    <div class="landing-preview-panel-head">
+                                        <div><strong>NVDA</strong><span>NVIDIA</span></div>
+                                        <strong class="landing-up">+18.42%</strong>
+                                    </div>
+                                    <div class="landing-chart-canvas">
+                                        <div class="landing-chart-grid" aria-hidden="true"></div>
+                                        <svg viewBox="0 0 720 220" role="img" aria-label="Example stock performance chart with buy and sell markers">
+                                            <polyline points="0,184 55,170 110,178 165,145 220,152 275,118 330,130 385,88 440,101 495,65 550,76 605,41 660,55 720,24" fill="none" stroke="#15803d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                                            <circle cx="220" cy="152" r="7" fill="#15803d" stroke="#ffffff" stroke-width="4"/>
+                                            <circle cx="550" cy="76" r="7" fill="#dc2626" stroke="#ffffff" stroke-width="4"/>
+                                        </svg>
+                                        <span class="landing-chart-marker landing-marker-buy">BUY</span>
+                                        <span class="landing-chart-marker landing-marker-sell">SELL</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="landing-preview-panel h-100">
+                                    <div class="landing-preview-panel-head"><strong>Exposure</strong><span>Market value</span></div>
+                                    <div class="landing-exposure-list">
+                                        {% for item in [
+                                            {symbol: 'NVDA', value: '24%', color: '#15803d'},
+                                            {symbol: 'MSFT', value: '19%', color: '#2563eb'},
+                                            {symbol: 'AAPL', value: '16%', color: '#d97706'},
+                                            {symbol: 'AMD', value: '11%', color: '#dc2626'},
+                                            {symbol: 'Other', value: '30%', color: '#64748b'}
+                                        ] %}
+                                            <div><span><i style="background: {{ item.color }}"></i>{{ item.symbol }}</span><strong>{{ item.value }}</strong></div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 landing-preview-bottom">
+                            <div class="col-lg-8">
+                                <div class="landing-preview-panel">
+                                    <div class="landing-preview-panel-head"><strong>Holdings</strong><span>All brokers</span></div>
+                                    <div class="table-responsive">
+                                        <table class="table landing-preview-table mb-0">
+                                            <thead><tr><th>Symbol</th><th>Total shares</th><th>Market value</th><th>Total P/L</th></tr></thead>
+                                            <tbody>
+                                                <tr><td><strong>NVDA</strong><small>NVIDIA</small></td><td>32</td><td>$10,164</td><td class="landing-up">+$2,180</td></tr>
+                                                <tr><td><strong>MSFT</strong><small>Microsoft</small></td><td>16</td><td>$8,046</td><td class="landing-up">+$1,240</td></tr>
+                                                <tr><td><strong>AAPL</strong><small>Apple</small></td><td>28</td><td>$6,776</td><td class="landing-down">-$184</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="landing-preview-panel h-100">
+                                    <div class="landing-preview-panel-head"><strong>Recent activity</strong><span>Latest</span></div>
+                                    <div class="landing-activity-list">
+                                        <div><span class="landing-buy-dot"></span>
+                                            <p>
+                                                <strong>You bought 4 NVDA @ $192,82 in XTB Main on 2026-06-19</strong>
+                                            </p>
+                                        </div>
+                                        <div><span class="landing-sell-dot"></span>
+                                            <p>
+                                                <strong>You sold 2 AAPL @ $215,17 in Revolut Stocks on 2026-06-12</strong>
+                                            </p>
+                                        </div>
+                                        <div><span class="landing-buy-dot"></span>
+                                            <p>
+                                                <strong>You bought 3 MSFT @ $391,82 in IBKR Main on 2026-06-10</strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-imports">
+                <div class="container landing-container">
+                    <div class="row align-items-end g-4 mb-5">
+                        <div class="col-lg-7">
+                            <div class="landing-section-heading mb-0">
+                                <span class="landing-kicker">Simple imports</span>
+                                <h2>Start with the brokers you already use.</h2>
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <p class="landing-section-copy mb-0">Upload your broker transactions and the app organizes your portfolio by stock, broker account, and performance.</p>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        {% for broker in [
+                            {name: 'XTB', detail: 'Native transaction export'},
+                            {name: 'Revolut', detail: 'Investment activity CSV'},
+                            {name: 'Custom CSV', detail: 'A simple open format'}
+                        ] %}
+                            <div class="col-md-4">
+                                <article class="landing-import-card">
+                                    <span>{{ loop.index < 10 ? '0' ~ loop.index : loop.index }}</span>
+                                    <div><h3>{{ broker.name }}</h3><p>{{ broker.detail }}</p></div>
+                                    <strong aria-hidden="true">CSV</strong>
+                                </article>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-how" id="how-it-works">
+                <div class="container landing-container">
+                    <div class="landing-section-heading">
+                        <span class="landing-kicker">Three clear steps</span>
+                        <h2>From transactions to understanding.</h2>
+                    </div>
+                    <div class="landing-steps">
+                        <article><span>1</span><div><h3>Import your transactions</h3><p>Upload XTB, Revolut, or custom CSV files.</p></div></article>
+                        <article><span>2</span><div><h3>See your real portfolio</h3><p>Positions, FIFO cost basis, invested capital, realized and unrealized gains.</p></div></article>
+                        <article><span>3</span><div><h3>Understand your decisions</h3><p>Open each stock page and see your buy and sell transactions on the chart.</p></div></article>
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-feature-list">
+                <div class="container landing-container">
+                    <div class="landing-section-heading text-center mx-auto">
+                        <span class="landing-kicker">Current capabilities</span>
+                        <h2>Built for clarity.</h2>
+                    </div>
+                    <div class="landing-feature-grid">
+                        {% for feature in [
+                            'Multi-broker accounts',
+                            'FIFO analytics',
+                            'Invested capital',
+                            'Realized and unrealized P/L',
+                            'Stock chart transaction markers',
+                            'Portfolio exposure',
+                            'Broker account breakdown',
+                            'Transaction history'
+                        ] %}
+                            <div><span aria-hidden="true">&#10003;</span>{{ feature }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-section landing-roadmap" id="roadmap">
+                <div class="container landing-container">
+                    <div class="row g-5 align-items-start">
+                        <div class="col-lg-4">
+                            <div class="landing-section-heading mb-3">
+                                <span class="landing-kicker">Roadmap</span>
+                                <h2>Built to grow with you.</h2>
+                            </div>
+                            <p class="landing-section-copy">Future features will help investors understand patterns, compare anonymized metrics, and get deeper portfolio analysis without exposing private data.</p>
+                        </div>
+                        <div class="col-lg-8">
+                            <div class="landing-roadmap-grid">
+                                {% for item in [
+                                    'AI Portfolio Review',
+                                    'Anonymous community insights',
+                                    'Trade journal and notes',
+                                    'More broker integrations'
+                                ] %}
+                                    <article><span>{{ loop.index < 10 ? '0' ~ loop.index : loop.index }}</span><h3>{{ item }}</h3></article>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-trust">
+                <div class="container landing-container">
+                    <div class="row g-5 align-items-center">
+                        <div class="col-lg-6">
+                            <span class="landing-kicker">Trust by design</span>
+                            <h2>Your portfolio is private.</h2>
+                            <p>Your transactions belong to you. Future community insights will be aggregated and anonymous, never exposed as individual portfolios.</p>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="landing-trust-points">
+                                <div><span>01</span><strong>Private by default</strong></div>
+                                <div><span>02</span><strong>User-scoped data</strong></div>
+                                <div><span>03</span><strong>Anonymous aggregated insights only</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="landing-final-cta">
+                <div class="container landing-container text-center">
+                    <span class="landing-kicker">A clearer next step</span>
+                    <h2>Become a better-informed investor.</h2>
+                    <p>Start by importing your transactions and seeing your portfolio clearly.</p>
+                    <div class="d-flex flex-column flex-sm-row justify-content-center gap-3">
+                        {% if app.user %}
+                            <a class="btn btn-dark btn-lg" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
+                        {% else %}
+                            <a class="btn btn-dark btn-lg" href="{{ path('app_register') }}">Create Free Account</a>
+                            <a class="btn btn-outline-dark btn-lg" href="{{ path('app_login') }}">Login</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="landing-footer">
+            <div class="container landing-container d-flex flex-column flex-sm-row align-items-center justify-content-between gap-3">
+                <a class="landing-brand" href="{{ path('app_home') }}"><span class="landing-brand-mark" aria-hidden="true"><span></span></span>FinApp</a>
+                <span>Portfolio clarity for long-term investors.</span>
+            </div>
+        </footer>
+    </div>
+{% endblock %}
