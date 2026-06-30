@@ -190,17 +190,17 @@
                                     <td class="text-end">{{ position.averageCost|money_symbol(position.currency) }}</td>
                                     <td class="text-end">{{ position.marketDataAvailable ? position.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
                                     <td class="text-end">{{ position.marketDataAvailable ? position.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
-                                    <td class="text-end {{ position.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                        {{ position.realizedGain|money_symbol(position.currency) }}
+                                    <td class="text-end {{ position.realizedGain|metric_class }}">
+                                        {{ position.realizedGain|signed_money(position.currency) }}
                                     </td>
-                                    <td class="text-end {{ position.marketDataAvailable and position.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                        {{ position.marketDataAvailable ? position.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                                    <td class="text-end {{ position.marketDataAvailable ? position.unrealizedGain|metric_class }}">
+                                        {{ position.marketDataAvailable ? position.unrealizedGain|signed_money(position.currency) : 'Unavailable' }}
                                     </td>
-                                    <td class="text-end {{ position.marketDataAvailable and position.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                        {{ position.marketDataAvailable ? position.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                    <td class="text-end {{ position.marketDataAvailable ? position.totalGain|metric_class }}">
+                                        {{ position.marketDataAvailable ? position.totalGain|signed_money(position.currency) : 'Unavailable' }}
                                     </td>
-                                    <td class="text-end {{ position.marketDataAvailable and position.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                        {{ position.marketDataAvailable ? position.totalGainPercent|trim_number ~ '%' : 'Unavailable' }}
+                                    <td class="text-end {{ position.marketDataAvailable ? position.totalGainPercent|metric_class }}">
+                                        {{ position.marketDataAvailable ? position.totalGainPercent|signed_percent : 'Unavailable' }}
                                     </td>
                                 </tr>
                                 <tr class="collapse" id="{{ rowId }}">
@@ -229,14 +229,14 @@
                                                                 <td class="text-end">{{ breakdown.averageCost|money_symbol(position.currency) }}</td>
                                                                 <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.currentPrice|money_symbol(position.currency) : 'Unavailable' }}</td>
                                                                 <td class="text-end">{{ breakdown.marketDataAvailable ? breakdown.marketValue|money_symbol(position.currency) : 'Unavailable' }}</td>
-                                                                <td class="text-end {{ breakdown.realizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                                                    {{ breakdown.realizedGain|money_symbol(position.currency) }}
+                                                                <td class="text-end {{ breakdown.realizedGain|metric_class }}">
+                                                                    {{ breakdown.realizedGain|signed_money(position.currency) }}
                                                                 </td>
-                                                                <td class="text-end {{ breakdown.marketDataAvailable and breakdown.unrealizedGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                                                    {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|money_symbol(position.currency) : 'Unavailable' }}
+                                                                <td class="text-end {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|metric_class }}">
+                                                                    {{ breakdown.marketDataAvailable ? breakdown.unrealizedGain|signed_money(position.currency) : 'Unavailable' }}
                                                                 </td>
-                                                                <td class="text-end {{ breakdown.marketDataAvailable and breakdown.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">
-                                                                    {{ breakdown.marketDataAvailable ? breakdown.totalGain|money_symbol(position.currency) : 'Unavailable' }}
+                                                                <td class="text-end {{ breakdown.marketDataAvailable ? breakdown.totalGain|metric_class }}">
+                                                                    {{ breakdown.marketDataAvailable ? breakdown.totalGain|signed_money(position.currency) : 'Unavailable' }}
                                                                 </td>
                                                             </tr>
                                                         {% endfor %}

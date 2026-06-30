@@ -20,6 +20,9 @@ class NumberFormatExtension extends AbstractExtension
         return [
             new TwigFilter('trim_number', [$this, 'trimNumber']),
             new TwigFilter('money_symbol', [$this, 'moneySymbol']),
+            new TwigFilter('signed_money', [$this, 'signedMoney']),
+            new TwigFilter('signed_percent', [$this, 'signedPercent']),
+            new TwigFilter('metric_class', [$this, 'metricClass']),
         ];
     }
 
@@ -39,6 +42,40 @@ class NumberFormatExtension extends AbstractExtension
         };
 
         return $symbol.$this->formatNumber($value, minimumMoneyDecimals: true);
+    }
+
+    public function signedMoney(mixed $value, ?string $currency): string
+    {
+        $sign = $this->displaySign($value);
+        $absoluteValue = ltrim(trim((string) $value), '+-');
+
+        return match ($sign) {
+            1 => '+'.$this->moneySymbol($absoluteValue, $currency),
+            -1 => '-'.$this->moneySymbol($absoluteValue, $currency),
+            default => $this->moneySymbol(0, $currency),
+        };
+    }
+
+    public function signedPercent(mixed $value): string
+    {
+        $sign = $this->displaySign($value);
+        $absoluteValue = ltrim(trim((string) $value), '+-');
+        $formatted = $this->trimNumber($absoluteValue).'%';
+
+        return match ($sign) {
+            1 => '+'.$formatted,
+            -1 => '-'.$formatted,
+            default => $this->trimNumber(0).'%',
+        };
+    }
+
+    public function metricClass(mixed $value): string
+    {
+        return match ($this->displaySign($value)) {
+            1 => 'text-positive',
+            -1 => 'text-negative',
+            default => '',
+        };
     }
 
     private function formatNumber(mixed $value, bool $minimumMoneyDecimals): string
@@ -98,6 +135,16 @@ class NumberFormatExtension extends AbstractExtension
         $formatted = $decimal === '' ? $whole : $whole.$decimalSeparator.$decimal;
 
         return $negative ? '-'.$formatted : $formatted;
+    }
+
+    private function displaySign(mixed $value): int
+    {
+        $number = str_replace(',', '', trim((string) $value));
+        if (!is_numeric($number)) {
+            return 0;
+        }
+
+        return round((float) $number, 2) <=> 0.0;
     }
 
     /**

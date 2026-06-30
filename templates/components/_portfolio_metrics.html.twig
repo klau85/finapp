@@ -44,7 +44,7 @@
                     <div class="text-secondary mb-2 metric-label" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ card.tooltip }}">{{ card.label }}</div>
                     {% if card.values %}
                         {% for currency, amount in card.values %}
-                            <div class="h5 mb-1 {{ card.signed ? (amount starts with '-' ? 'text-negative' : 'text-positive') }}">{{ amount|money_symbol(currency) }}</div>
+                            <div class="h5 mb-1 {{ card.signed ? amount|metric_class }}">{{ card.signed ? amount|signed_money(currency) : amount|money_symbol(currency) }}</div>
                         {% endfor %}
                     {% else %}
                         <div class="h3 mb-0">{{ card.unavailable }}</div>

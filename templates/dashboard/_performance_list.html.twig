@@ -16,8 +16,8 @@
                         <td>
                             <a class="fw-semibold text-decoration-none" href="{{ path('app_stock_show', { symbol: item.symbol }) }}">{{ item.symbol }}</a>
                         </td>
-                        <td class="text-end {{ item.totalGain starts with '-' ? 'text-negative' : 'text-positive' }}">{{ item.totalGain|money_symbol(item.currency) }}</td>
-                        <td class="text-end {{ item.totalGainPercent starts with '-' ? 'text-negative' : 'text-positive' }}">{{ item.totalGainPercent|trim_number }}%</td>
+                        <td class="text-end {{ item.totalGain|metric_class }}">{{ item.totalGain|signed_money(item.currency) }}</td>
+                        <td class="text-end {{ item.totalGainPercent|metric_class }}">{{ item.totalGainPercent|signed_percent }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
