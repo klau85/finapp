@@ -21,7 +21,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 
 final class MarketDataManager
 {
-    private const MAX_BATCH_QUOTE_STOCKS = 5;
+    private const MAX_BATCH_QUOTE_STOCKS = 10;
 
     /**
      * @var array<class-string<MarketDataProviderInterface>, true>
