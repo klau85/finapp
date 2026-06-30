@@ -305,6 +305,7 @@
             }
 
             const eventButtons = eventStrip ? Array.from(eventStrip.querySelectorAll('[data-event-time]')) : [];
+            const rightPaddingBars = 30;
             const formatChartTime = (time) => {
                 if (!time) {
                     return null;
@@ -331,10 +332,37 @@
                     }
                 }
             };
+            const scrollChartToEvent = (time) => {
+                const eventIndex = chart.timeScale().timeToIndex(time, true);
+                const visibleRange = chart.timeScale().getVisibleLogicalRange();
+                if (eventIndex === null || visibleRange === null) {
+                    return;
+                }
+
+                const visibleBars = visibleRange.to - visibleRange.from;
+                const maximumTo = candles.length - 1 + rightPaddingBars;
+                let from = eventIndex - (visibleBars / 2);
+                let to = eventIndex + (visibleBars / 2);
+
+                if (from < 0) {
+                    to -= from;
+                    from = 0;
+                }
+                if (to > maximumTo) {
+                    from -= to - maximumTo;
+                    to = maximumTo;
+                }
+
+                chart.timeScale().setVisibleLogicalRange({
+                    from: Math.max(0, from),
+                    to
+                });
+            };
 
             eventButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     setActiveEvent(button.dataset.eventTime);
+                    scrollChartToEvent(button.dataset.eventTime);
                 });
             });
 
@@ -357,7 +385,21 @@
                 }
             });
 
-            chart.timeScale().fitContent();
+            const latestCandleTime = candles[candles.length - 1].time;
+            const visibleFromDate = new Date(`${latestCandleTime}T00:00:00Z`);
+            visibleFromDate.setUTCMonth(visibleFromDate.getUTCMonth() - 16);
+            chart.timeScale().setVisibleRange({
+                from: visibleFromDate.toISOString().slice(0, 10),
+                to: latestCandleTime
+            });
+
+            const visibleLogicalRange = chart.timeScale().getVisibleLogicalRange();
+            if (visibleLogicalRange !== null) {
+                chart.timeScale().setVisibleLogicalRange({
+                    from: visibleLogicalRange.from,
+                    to: visibleLogicalRange.to + rightPaddingBars
+                });
+            }
         });
     </script>
 {% endblock %}
