@@ -160,6 +160,7 @@ class JournalController extends AbstractController
 
         $entityManager->persist($entry);
         $entityManager->flush();
+
         $this->addFlash('success', $entryId > 0 ? 'Journal entry updated.' : 'Journal entry created.');
 
         return $this->redirectToRoute('app_portfolio');
@@ -211,6 +212,10 @@ class JournalController extends AbstractController
             || !$entryDate instanceof \DateTimeImmutable
             || $entryDate->format('Y-m-d') !== $entryDateValue
         ) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Select a valid journal type and date.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $this->addFlash('danger', 'Select a valid journal type and date.');
 
             return $this->redirectToRoute('app_stock_show', ['symbol' => $symbol]);
@@ -223,6 +228,10 @@ class JournalController extends AbstractController
             ->setContent((string) $request->request->get('content', ''));
 
         if (count($validator->validate($entry)) > 0) {
+            if ($request->isXmlHttpRequest()) {
+                return $this->json(['success' => false, 'message' => 'Complete the required journal fields.'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $this->addFlash('danger', 'Complete the required journal fields.');
 
             return $this->redirectToRoute('app_stock_show', ['symbol' => $symbol]);
@@ -230,6 +239,40 @@ class JournalController extends AbstractController
 
         $entityManager->persist($entry);
         $entityManager->flush();
+
+        if ($request->isXmlHttpRequest()) {
+            $entries = $journalEntries->findByTransactionIdsForUser($user, [$transactionId])[$transactionId] ?? [];
+            $entryTypes = array_combine(
+                JournalEntry::ENTRY_TYPES,
+                array_map(
+                    static fn (string $type): string => ucwords(strtolower(str_replace('_', ' ', $type))),
+                    JournalEntry::ENTRY_TYPES,
+                ),
+            );
+
+            return $this->json([
+                'success' => true,
+                'transactionId' => $transactionId,
+                'modalHtml' => $this->renderView('journal/_transaction_modals.html.twig', [
+                    'transactions' => [[
+                        'id' => $transactionId,
+                        'date' => $transaction->getTransactionDate()->format('Y-m-d'),
+                        'symbol' => $symbol,
+                        'type' => $transaction->getType(),
+                        'quantity' => $transaction->getQuantity(),
+                        'price' => $transaction->getPrice(),
+                        'currency' => $transaction->getCurrency(),
+                    ]],
+                    'entriesByTransactionId' => [$transactionId => $entries],
+                    'entryTypes' => $entryTypes,
+                ]),
+                'controlsHtml' => $this->renderView('journal/_transaction_controls.html.twig', [
+                    'transactionId' => $transactionId,
+                    'hasNotes' => true,
+                ]),
+            ]);
+        }
+
         $this->addFlash('success', $entryId > 0 ? 'Journal entry updated.' : 'Journal entry created.');
 
         return $this->redirectToRoute('app_stock_show', ['symbol' => $symbol]);

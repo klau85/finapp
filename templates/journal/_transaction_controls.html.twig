@@ -1,0 +1,4 @@
+{% if hasNotes %}
+    <button type="button" class="btn btn-sm btn-dark" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}" data-journal-open-action="view" data-journal-transaction="{{ transactionId }}">View notes</button>
+{% endif %}
+<button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}" data-journal-open-action="add" data-journal-transaction="{{ transactionId }}">Add note</button>

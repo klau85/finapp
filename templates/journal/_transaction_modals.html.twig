@@ -21,7 +21,7 @@
 
                     <div data-journal-panel="add" data-journal-transaction="{{ transaction.id }}" hidden>
                         <h3 class="h6 mb-3">Add transaction note</h3>
-                        <form method="post" action="{{ path('app_journal_transaction_save', { transactionId: transaction.id }) }}">
+                        <form method="post" action="{{ path('app_journal_transaction_save', { transactionId: transaction.id }) }}" data-transaction-journal-form data-transaction-id="{{ transaction.id }}">
                             <input type="hidden" name="_token" value="{{ csrf_token('transaction_journal_' ~ transaction.id) }}">
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -69,7 +69,7 @@
                         {% for entry in entries %}
                             <div data-journal-panel="edit-{{ entry.id }}" data-journal-transaction="{{ transaction.id }}" hidden>
                                 <h3 class="h6 mb-3">Edit transaction note</h3>
-                                <form method="post" action="{{ path('app_journal_transaction_save', { transactionId: transaction.id }) }}">
+                                <form method="post" action="{{ path('app_journal_transaction_save', { transactionId: transaction.id }) }}" data-transaction-journal-form data-transaction-id="{{ transaction.id }}">
                                     <input type="hidden" name="_token" value="{{ csrf_token('transaction_journal_' ~ transaction.id) }}">
                                     <input type="hidden" name="entry_id" value="{{ entry.id }}">
                                     <div class="row g-3">

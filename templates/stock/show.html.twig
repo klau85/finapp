@@ -10,6 +10,13 @@
         }
 
         .chart-transaction-overlay {
+            inset: 0;
+            pointer-events: none;
+            position: absolute;
+            z-index: 20;
+        }
+
+        .chart-transaction-card {
             background: #ffffff;
             border: 1px solid var(--app-border);
             border-radius: 8px;
@@ -18,10 +25,10 @@
             max-height: 300px;
             overflow-y: auto;
             padding: .75rem;
+            pointer-events: auto;
             position: absolute;
             top: 0;
             width: min(320px, calc(100% - 16px));
-            z-index: 20;
         }
 
         .chart-event-detail {
@@ -73,7 +80,7 @@
             {% endif %}
             <div id="stock-chart-stage" class="stock-chart-stage {{ chartUnavailable ? 'd-none' : '' }}">
                 <div id="stock-chart" style="height: 460px;"></div>
-                <div id="chart-transaction-overlay" class="chart-transaction-overlay" hidden></div>
+                <div id="chart-transaction-overlay" class="chart-transaction-overlay"></div>
             </div>
             {% if not chartUnavailable and markers %}
                 <div hidden aria-hidden="true">
@@ -92,11 +99,8 @@
                                     <div class="{{ not loop.first ? 'mt-3 pt-3 border-top' }}">
                                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                                             <div class="chart-event-detail">{{ detail }}</div>
-                                            <div class="d-inline-flex flex-wrap gap-2">
-                                                {% if transactionJournalEntries %}
-                                                    <button type="button" class="btn btn-sm btn-dark" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}" data-journal-open-action="view" data-journal-transaction="{{ transactionId }}">View notes</button>
-                                                {% endif %}
-                                                <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}" data-journal-open-action="add" data-journal-transaction="{{ transactionId }}">Add note</button>
+                                            <div class="d-inline-flex flex-wrap gap-2" data-transaction-journal-controls="{{ transactionId }}">
+                                                {% include 'journal/_transaction_controls.html.twig' with { transactionId: transactionId, hasNotes: transactionJournalEntries is not empty } only %}
                                             </div>
                                         </div>
                                     </div>
@@ -275,11 +279,8 @@
                                 <td class="text-end">{{ transaction.totalAmount|money_symbol(transaction.currency) }}</td>
                                 <td class="text-end">
                                     {% set transactionJournalEntries = journalEntriesByTransactionId[transaction.id]|default([]) %}
-                                    <div class="d-inline-flex flex-wrap justify-content-end gap-2">
-                                        {% if transactionJournalEntries %}
-                                            <button type="button" class="btn btn-sm btn-dark" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transaction.id }}" data-journal-open-action="view" data-journal-transaction="{{ transaction.id }}">View notes</button>
-                                        {% endif %}
-                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transaction.id }}" data-journal-open-action="add" data-journal-transaction="{{ transaction.id }}">Add note</button>
+                                    <div class="d-inline-flex flex-wrap justify-content-end gap-2" data-transaction-journal-controls="{{ transaction.id }}">
+                                        {% include 'journal/_transaction_controls.html.twig' with { transactionId: transaction.id, hasNotes: transactionJournalEntries is not empty } only %}
                                     </div>
                                 </td>
                             </tr>
@@ -301,6 +302,11 @@
             const transactionOverlay = document.getElementById('chart-transaction-overlay');
             const candles = {{ candles|json_encode|raw }};
             const markers = {{ markers|json_encode|raw }};
+            let transactionCardZIndex = 0;
+            const bringTransactionCardToFront = (card) => {
+                transactionCardZIndex += 1;
+                card.style.zIndex = String(transactionCardZIndex);
+            };
             const activateJournalPanel = (transactionId, panelName) => {
                 document.querySelectorAll(`[data-journal-panel][data-journal-transaction="${transactionId}"]`).forEach((panel) => {
                     panel.hidden = panel.dataset.journalPanel !== panelName;
@@ -317,23 +323,84 @@
                 });
             };
 
-            document.querySelectorAll('[data-journal-action]').forEach((action) => {
-                action.addEventListener('click', () => {
-                    activateJournalPanel(action.dataset.journalTransaction, action.dataset.journalAction);
-                });
-            });
-
             document.addEventListener('click', (event) => {
+                const panelAction = event.target.closest('[data-journal-action]');
+                if (panelAction) {
+                    activateJournalPanel(panelAction.dataset.journalTransaction, panelAction.dataset.journalAction);
+                }
+
                 const action = event.target.closest('[data-journal-open-action]');
                 if (action) {
                     activateJournalPanel(action.dataset.journalTransaction, action.dataset.journalOpenAction);
                 }
             });
+
+            document.addEventListener('submit', async (event) => {
+                const form = event.target.closest('[data-transaction-journal-form]');
+                if (!form) {
+                    return;
+                }
+
+                event.preventDefault();
+                const transactionId = form.dataset.transactionId;
+                const submitButton = form.querySelector('[type="submit"]');
+                submitButton?.setAttribute('disabled', 'disabled');
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.message || 'The journal note could not be saved.');
+                    }
+
+                    const parsedModal = document.createElement('template');
+                    parsedModal.innerHTML = payload.modalHtml.trim();
+                    const refreshedContent = parsedModal.content.querySelector('.modal-content');
+                    const currentModal = document.getElementById(`transactionJournal${transactionId}`);
+                    if (refreshedContent && currentModal) {
+                        currentModal.querySelector('.modal-content')?.replaceWith(refreshedContent);
+                    }
+
+                    document.querySelectorAll(`[data-transaction-journal-controls="${transactionId}"]`).forEach((controls) => {
+                        controls.innerHTML = payload.controlsHtml;
+                    });
+                    document.querySelectorAll('template[id^="chart-transaction-template-"]').forEach((template) => {
+                        template.content.querySelectorAll(`[data-transaction-journal-controls="${transactionId}"]`).forEach((controls) => {
+                            controls.innerHTML = payload.controlsHtml;
+                        });
+                    });
+                    activateJournalPanel(transactionId, 'view');
+                } catch (error) {
+                    const modalBody = form.closest('.modal-body');
+                    let alert = modalBody?.querySelector('[data-journal-save-error]');
+                    if (!alert && modalBody) {
+                        alert = document.createElement('div');
+                        alert.className = 'alert alert-danger';
+                        alert.dataset.journalSaveError = '';
+                        modalBody.prepend(alert);
+                    }
+                    if (alert) {
+                        alert.textContent = error instanceof Error ? error.message : 'The journal note could not be saved.';
+                    }
+                    submitButton?.removeAttribute('disabled');
+                }
+            });
             transactionOverlay?.addEventListener('click', (event) => {
+                const card = event.target.closest('.chart-transaction-card');
+                if (card) {
+                    bringTransactionCardToFront(card);
+                }
+
                 const close = event.target.closest('[data-chart-transaction-close]');
                 if (close) {
-                    transactionOverlay.hidden = true;
-                    transactionOverlay.replaceChildren();
+                    close.closest('.chart-transaction-card')?.remove();
 
                     return;
                 }
@@ -341,9 +408,10 @@
             });
 
             const markerDataById = new Map();
-            const chartMarkers = markers.map(({ time, position, color, shape, text }, index) => {
+            const candlesByTime = new Map(candles.map((candle) => [String(candle.time), candle]));
+            const chartMarkers = markers.map(({ time, position, color, shape, text, type }, index) => {
                 const id = `transaction-marker-${index}`;
-                markerDataById.set(id, { index, time });
+                markerDataById.set(id, { index, time, position, type });
 
                 return { id, time, position, color, shape, text };
             });
@@ -389,26 +457,77 @@
             }
 
             const rightPaddingBars = 30;
+            const markerPriceCoordinate = (marker) => {
+                const candle = candlesByTime.get(String(marker.time));
+                if (!candle) {
+                    return null;
+                }
+
+                const price = marker.position === 'aboveBar'
+                    ? candle.high
+                    : (marker.position === 'belowBar' ? candle.low : candle.close);
+
+                return series.priceToCoordinate(price);
+            };
+            const positionTransactionCard = (card, marker, point = null) => {
+                const x = chart.timeScale().timeToCoordinate(marker.time);
+                const candleY = markerPriceCoordinate(marker);
+                if (x === null || candleY === null || x < 0 || x > chartStage.clientWidth) {
+                    card.hidden = true;
+
+                    return;
+                }
+
+                if (point && Number.isFinite(point.y)) {
+                    card.dataset.markerYOffset = String(point.y - candleY);
+                }
+
+                card.hidden = false;
+                const markerYOffset = Number(card.dataset.markerYOffset ?? 0);
+                const cardOffset = Number(card.dataset.cardOffset ?? 0);
+                const markerY = candleY + markerYOffset;
+                const margin = 8;
+                const left = Math.min(
+                    Math.max(margin, x - (card.offsetWidth / 2) + cardOffset),
+                    chartStage.clientWidth - card.offsetWidth - margin
+                );
+                const cardIsAboveMarker = marker.type === 'SELL' || marker.position === 'aboveBar';
+                const requestedTop = cardIsAboveMarker
+                    ? markerY - card.offsetHeight - 20 - cardOffset
+                    : markerY + 20 + cardOffset;
+                const top = Math.min(
+                    requestedTop,
+                    chartStage.clientHeight - card.offsetHeight - margin
+                );
+                card.style.left = `${Math.max(margin, left)}px`;
+                card.style.top = `${Math.max(margin, top)}px`;
+            };
+            const repositionTransactionCards = () => {
+                transactionOverlay?.querySelectorAll('.chart-transaction-card').forEach((card) => {
+                    const marker = markers[Number(card.dataset.markerIndex)];
+                    if (marker) {
+                        positionTransactionCard(card, marker);
+                    }
+                });
+            };
             const showTransactionCard = (marker, point) => {
                 const template = document.getElementById(`chart-transaction-template-${marker.index}`);
                 if (!template || !transactionOverlay || !chartStage || !point) {
                     return;
                 }
 
-                transactionOverlay.replaceChildren(template.content.cloneNode(true));
-                transactionOverlay.hidden = false;
+                const existingCard = transactionOverlay.querySelector(`[data-marker-index="${marker.index}"]`);
+                const card = existingCard ?? document.createElement('div');
+                if (!existingCard) {
+                    card.className = 'chart-transaction-card';
+                    card.dataset.markerIndex = marker.index;
+                    card.dataset.cardOffset = String(transactionOverlay.children.length * 10);
+                    card.append(template.content.cloneNode(true));
+                    transactionOverlay.append(card);
+                }
 
-                const margin = 8;
-                const left = Math.min(
-                    Math.max(margin, point.x - (transactionOverlay.offsetWidth / 2)),
-                    chartStage.clientWidth - transactionOverlay.offsetWidth - margin
-                );
-                const top = Math.min(
-                    point.y + 20,
-                    chartStage.clientHeight - transactionOverlay.offsetHeight - margin
-                );
-                transactionOverlay.style.left = `${Math.max(margin, left)}px`;
-                transactionOverlay.style.top = `${Math.max(margin, top)}px`;
+                bringTransactionCardToFront(card);
+                positionTransactionCard(card, marker, point);
             };
 
             chart.subscribeCrosshairMove((param) => {
@@ -423,12 +542,18 @@
                 }
             });
 
+            let repositionFrame = null;
             chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-                if (transactionOverlay && !transactionOverlay.hidden) {
-                    transactionOverlay.hidden = true;
-                    transactionOverlay.replaceChildren();
+                if (repositionFrame !== null) {
+                    cancelAnimationFrame(repositionFrame);
                 }
+                repositionFrame = requestAnimationFrame(() => {
+                    repositionTransactionCards();
+                    repositionFrame = null;
+                });
             });
+
+            new ResizeObserver(repositionTransactionCards).observe(chartStage);
 
             const latestCandleTime = candles[candles.length - 1].time;
             const visibleFromDate = new Date(`${latestCandleTime}T00:00:00Z`);
