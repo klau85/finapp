@@ -62,7 +62,7 @@
                 <a class="btn btn-sm btn-outline-secondary {{ timeframe == 'daily' ? 'active' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'daily' }) }}" aria-current="{{ timeframe == 'daily' ? 'page' : 'false' }}">1D</a>
                 <a class="btn btn-sm btn-outline-secondary {{ timeframe == 'weekly' ? 'active' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'weekly' }) }}" aria-current="{{ timeframe == 'weekly' ? 'page' : 'false' }}">1W</a>
             </div>
-            <button class="btn btn-sm btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#stockJournalModal">Journal</button>
+            <button class="btn btn-sm btn-dark app-header-action" type="button" data-bs-toggle="modal" data-bs-target="#stockJournalModal">Journal</button>
         </div>
     </div>
 
