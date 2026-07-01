@@ -1,0 +1,62 @@
+{% if entries %}
+    <div class="journal-timeline">
+        {% for entry in entries %}
+            {% set badgeClass = entry.entryType in ['BUY_REASON', 'BULL_THESIS']
+                ? 'badge-journal-positive'
+                : (entry.entryType in ['SELL_REASON', 'BEAR_THESIS']
+                    ? 'badge-journal-negative'
+                    : (entry.entryType == 'RISK'
+                        ? 'badge-journal-risk'
+                        : (entry.entryType == 'REVIEW' ? 'badge-journal-info' : 'badge-journal-general'))) %}
+            <article class="journal-timeline-item mb-4">
+                <span class="journal-timeline-dot" aria-hidden="true"></span>
+                <div class="small text-secondary mb-2">{{ entry.entryDate|date('F j, Y') }}</div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-2 mb-3">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="fw-semibold">{{ entry.targetLabel }}</span>
+                                <span class="badge {{ badgeClass }}">{{ entry.entryTypeLabel }}</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ path('app_journal_edit', { id: entry.id }) }}">Edit</a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteJournal{{ entry.id }}">Delete</button>
+                            </div>
+                        </div>
+                        {% if entry.transaction %}
+                            <div class="mb-3">
+                                {% include 'journal/_transaction_details.html.twig' with { transaction: entry.transaction } only %}
+                            </div>
+                        {% endif %}
+                        {% if entry.title %}
+                            <h2 class="h5 mb-2">
+                                <a class="text-dark text-decoration-none" href="{{ path('app_journal_show', { id: entry.id }) }}">{{ entry.title }}</a>
+                            </h2>
+                        {% endif %}
+                        <p class="text-secondary mb-3" style="white-space: pre-line;">{{ fullContent|default(false) ? entry.content : (entry.content|length > 220 ? entry.content|slice(0, 220) ~ '...' : entry.content) }}</p>
+                        <a class="btn btn-sm btn-dark" href="{{ path('app_journal_show', { id: entry.id }) }}">View entry</a>
+                    </div>
+                </div>
+            </article>
+
+            <div class="modal fade" id="deleteJournal{{ entry.id }}" tabindex="-1" aria-labelledby="deleteJournal{{ entry.id }}Label" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="modal-title fs-5" id="deleteJournal{{ entry.id }}Label">Delete journal entry</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">This journal entry will be permanently deleted.</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <form method="post" action="{{ path('app_journal_delete', { id: entry.id }) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('delete_journal_' ~ entry.id) }}">
+                                <button type="submit" class="btn btn-danger">Delete entry</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}

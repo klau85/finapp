@@ -1,0 +1,116 @@
+{% set context = 'stock-' ~ stock.id %}
+<div class="modal fade" id="stockJournalModal" tabindex="-1" aria-labelledby="stockJournalModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="small text-secondary mb-1">{{ stock.symbol }}</div>
+                    <h2 class="modal-title fs-5" id="stockJournalModalLabel">Stock Journal</h2>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex flex-wrap gap-2 mb-4" role="group" aria-label="Stock journal actions">
+                    <button type="button" class="btn btn-sm btn-outline-success" data-journal-action="add" data-journal-transaction="{{ context }}">Add note</button>
+                    {% if entries %}
+                        <button type="button" class="btn btn-sm btn-dark" data-journal-action="view" data-journal-tone="dark" data-journal-transaction="{{ context }}">View notes</button>
+                    {% endif %}
+                </div>
+
+                <div data-journal-panel="add" data-journal-transaction="{{ context }}" hidden>
+                    <h3 class="h6 mb-3">Add stock note</h3>
+                    <form method="post" action="{{ path('app_journal_stock_save', { symbol: stock.symbol }) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('stock_journal_' ~ stock.id) }}">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="stock-add-entry-type">Entry type</label>
+                                <select class="form-select" id="stock-add-entry-type" name="entry_type" required>
+                                    {% for value, label in entryTypes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="stock-add-entry-date">Entry date</label>
+                                <input class="form-control" id="stock-add-entry-date" type="date" name="entry_date" value="{{ 'now'|date('Y-m-d', 'UTC') }}" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="stock-add-title">Title <span class="text-secondary">(optional)</span></label>
+                                <input class="form-control" id="stock-add-title" name="title" maxlength="180">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="stock-add-content">Note</label>
+                                <textarea class="form-control" id="stock-add-content" name="content" rows="5" required></textarea>
+                            </div>
+                        </div>
+                        <button class="btn btn-dark mt-3" type="submit">Save note</button>
+                    </form>
+                </div>
+
+                {% if entries %}
+                    <div data-journal-panel="view" data-journal-transaction="{{ context }}" hidden>
+                        <div class="vstack gap-3">
+                            {% for entry in entries %}
+                                {% set linkedTransaction = entry.transaction %}
+                                <article class="border rounded-3 p-3">
+                                    <div class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-2 mb-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="badge badge-journal-general">{{ entry.entryTypeLabel }}</span>
+                                            <span class="small text-secondary">{{ entry.entryDate|date('F j, Y') }}</span>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-journal-action="edit-{{ entry.id }}" data-journal-transaction="{{ context }}">Edit note</button>
+                                    </div>
+                                    {% if linkedTransaction %}
+                                        <div class="mb-2">
+                                            {% include 'journal/_transaction_details.html.twig' with { transaction: linkedTransaction } only %}
+                                        </div>
+                                    {% endif %}
+                                    {% if entry.title %}<h3 class="h6 mb-2">{{ entry.title }}</h3>{% endif %}
+                                    <p class="small mb-0" style="white-space: pre-line;">{{ entry.content }}</p>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {% for entry in entries %}
+                        {% set linkedTransaction = entry.transaction %}
+                        <div data-journal-panel="edit-{{ entry.id }}" data-journal-transaction="{{ context }}" hidden>
+                            <h3 class="h6 mb-3">Edit {{ linkedTransaction ? 'transaction' : 'stock' }} note</h3>
+                            {% if linkedTransaction %}
+                                <div class="mb-3">
+                                    {% include 'journal/_transaction_details.html.twig' with { transaction: linkedTransaction } only %}
+                                </div>
+                            {% endif %}
+                            <form method="post" action="{{ linkedTransaction ? path('app_journal_transaction_save', { transactionId: linkedTransaction.id }) : path('app_journal_stock_save', { symbol: stock.symbol }) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token(linkedTransaction ? 'transaction_journal_' ~ linkedTransaction.id : 'stock_journal_' ~ stock.id) }}">
+                                <input type="hidden" name="entry_id" value="{{ entry.id }}">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="stock-edit-entry-type-{{ entry.id }}">Entry type</label>
+                                        <select class="form-select" id="stock-edit-entry-type-{{ entry.id }}" name="entry_type" required>
+                                            {% for value, label in entryTypes %}<option value="{{ value }}" {{ value == entry.entryType ? 'selected' }}>{{ label }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="stock-edit-entry-date-{{ entry.id }}">Entry date</label>
+                                        <input class="form-control" id="stock-edit-entry-date-{{ entry.id }}" type="date" name="entry_date" value="{{ entry.entryDate|date('Y-m-d') }}" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="stock-edit-title-{{ entry.id }}">Title <span class="text-secondary">(optional)</span></label>
+                                        <input class="form-control" id="stock-edit-title-{{ entry.id }}" name="title" value="{{ entry.title }}" maxlength="180">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="stock-edit-content-{{ entry.id }}">Note</label>
+                                        <textarea class="form-control" id="stock-edit-content-{{ entry.id }}" name="content" rows="5" required>{{ entry.content }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-3">
+                                    <button class="btn btn-dark" type="submit">Save changes</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-journal-action="view" data-journal-transaction="{{ context }}">Back to notes</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

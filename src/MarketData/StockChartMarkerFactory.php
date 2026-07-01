@@ -16,7 +16,7 @@ final readonly class StockChartMarkerFactory
     /**
      * @param list<Transaction> $transactions
      * @param list<\App\Dto\OhlcDto> $candles
-     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>}>
+     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>, transactionIds: list<int>}>
      */
     public function create(array $transactions, array $candles, string $timeframe): array
     {
@@ -27,7 +27,7 @@ final readonly class StockChartMarkerFactory
 
     /**
      * @param list<Transaction> $transactions
-     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>}>
+     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>, transactionIds: list<int>}>
      */
     private function createDailyMarkers(array $transactions): array
     {
@@ -40,8 +40,10 @@ final readonly class StockChartMarkerFactory
                 'time' => $date,
                 'type' => $type,
                 'details' => [],
+                'transactionIds' => [],
             ];
             $grouped[$key]['details'][] = $this->transactionText($transaction);
+            $grouped[$key]['transactionIds'][] = (int) $transaction->getId();
         }
 
         return array_map(
@@ -49,6 +51,7 @@ final readonly class StockChartMarkerFactory
                 (string) $group['time'],
                 (string) $group['type'],
                 $group['details'],
+                $group['transactionIds'],
             ),
             array_values($grouped),
         );
@@ -57,7 +60,7 @@ final readonly class StockChartMarkerFactory
     /**
      * @param list<Transaction> $transactions
      * @param list<\App\Dto\OhlcDto> $candles
-     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>}>
+     * @return list<array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>, transactionIds: list<int>}>
      */
     private function createWeeklyMarkers(array $transactions, array $candles): array
     {
@@ -79,8 +82,10 @@ final readonly class StockChartMarkerFactory
                 'time' => $weekDates[$weekKey],
                 'type' => $type,
                 'details' => [],
+                'transactionIds' => [],
             ];
             $grouped[$key]['details'][] = $this->transactionText($transaction);
+            $grouped[$key]['transactionIds'][] = (int) $transaction->getId();
         }
 
         return array_map(
@@ -88,6 +93,7 @@ final readonly class StockChartMarkerFactory
                 (string) $group['time'],
                 (string) $group['type'],
                 $group['details'],
+                $group['transactionIds'],
             ),
             array_values($grouped),
         );
@@ -95,9 +101,10 @@ final readonly class StockChartMarkerFactory
 
     /**
      * @param list<string> $details
-     * @return array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>}
+     * @param list<int> $transactionIds
+     * @return array{time: string, position: string, color: string, shape: string, text: string, type: string, details: list<string>, transactionIds: list<int>}
      */
-    private function marker(string $time, string $type, array $details): array
+    private function marker(string $time, string $type, array $details, array $transactionIds): array
     {
         $buy = in_array($type, ['BUY', 'MERGER_IN'], true);
         $split = $type === 'STOCK_SPLIT';
@@ -121,6 +128,7 @@ final readonly class StockChartMarkerFactory
             'text' => $label,
             'type' => $type,
             'details' => $details,
+            'transactionIds' => $transactionIds,
         ];
     }
 

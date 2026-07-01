@@ -147,4 +147,25 @@
             </div>
         </div>
     {% endif %}
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                <h2 class="h5 mb-0">Recent Journal Entries</h2>
+                <a class="small text-decoration-none" href="{{ path('app_journal') }}">View Journal</a>
+            </div>
+            {% if recentJournalEntries %}
+                <div class="vstack gap-2">
+                    {% for entry in recentJournalEntries %}
+                        <a class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-1 border-bottom pb-2 text-dark text-decoration-none" href="{{ path('app_journal_show', { id: entry.id }) }}">
+                            <span><strong>{{ entry.targetLabel }}</strong> — {{ entry.entryTypeLabel }}</span>
+                            <span class="small text-secondary">{{ entry.entryDate|date('Y-m-d') }}</span>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-secondary mb-0">Start your investment journal.</p>
+            {% endif %}
+        </div>
+    </div>
 {% endblock %}

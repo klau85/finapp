@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ entry.title ?: entry.entryTypeLabel }} | Journal{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">{{ entry.entryDate|date('F j, Y') }} · {{ entry.targetLabel }}</div>
+            <h1 class="h2 mb-0">{{ entry.title ?: entry.entryTypeLabel }}</h1>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-primary" href="{{ path('app_journal_edit', { id: entry.id }) }}">Edit</a>
+            <a class="btn btn-outline-secondary" href="{{ path('app_journal') }}">Back to journal</a>
+        </div>
+    </div>
+    {% include 'journal/_timeline.html.twig' with { entries: [entry], fullContent: true } only %}
+{% endblock %}

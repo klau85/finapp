@@ -51,7 +51,7 @@
                 <a class="btn btn-sm {{ timeframe == 'daily' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'daily' }) }}">1D</a>
                 <a class="btn btn-sm {{ timeframe == 'weekly' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'weekly' }) }}">1W</a>
             </div>
-            <a class="btn btn-outline-secondary" href="{{ path('app_portfolio') }}">Back to portfolio</a>
+            <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#stockJournalModal">Journal</button>
         </div>
     </div>
 
@@ -69,21 +69,49 @@
                     </div>
                     <div id="chart-transaction-events" class="chart-event-strip" aria-label="Transactions on chart">
                         {% for marker in markers %}
-                            <button type="button" class="chart-event-card" data-event-time="{{ marker.time }}">
+                            <div class="chart-event-card" data-event-time="{{ marker.time }}" tabindex="0">
                                 <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                                     <span class="small fw-semibold">{{ marker.time }}</span>
                                     <span class="badge {{ marker.type == 'BUY' ? 'badge-buy' : (marker.type == 'SELL' ? 'badge-sell' : 'text-bg-secondary') }}">{{ marker.text }}</span>
                                 </div>
                                 {% for detail in marker.details %}
-                                    <div class="chart-event-detail">{{ detail }}</div>
+                                    {% set transactionId = marker.transactionIds[loop.index0] %}
+                                    <div
+                                        class="{{ not loop.first ? 'mt-3 pt-3 border-top' }}"
+                                        {% if not loop.first %}data-extra-transaction hidden{% endif %}
+                                    >
+                                        <div class="d-flex align-items-center justify-content-between gap-2">
+                                            <div class="chart-event-detail">{{ detail }}</div>
+                                            <button type="button" class="btn btn-sm btn-dark flex-shrink-0" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}">Journal</button>
+                                        </div>
+                                    </div>
                                 {% endfor %}
-                            </button>
+                                {% if marker.details|length > 1 %}
+                                    <div class="mt-3">
+                                        <button type="button" class="btn btn-sm btn-link px-0 text-decoration-none" data-transactions-toggle aria-expanded="false">
+                                            <span data-more-label>More</span>
+                                            <span data-less-label hidden>Less</span>
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            </div>
                         {% endfor %}
                     </div>
                 </div>
             {% endif %}
         </div>
     </div>
+
+    {% include 'journal/_transaction_modals.html.twig' with {
+        transactions: transactions,
+        entriesByTransactionId: journalEntriesByTransactionId,
+        entryTypes: journalEntryTypes
+    } only %}
+    {% include 'journal/_stock_modal.html.twig' with {
+        stock: stock,
+        entries: stockJournalEntries,
+        entryTypes: journalEntryTypes
+    } only %}
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">
@@ -210,6 +238,7 @@
                             <th>Currency</th>
                             <th class="text-end">Broker amount</th>
                             <th class="text-end">Total amount</th>
+                            <th class="text-end">Journal</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -238,6 +267,14 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-end">{{ transaction.totalAmount|money_symbol(transaction.currency) }}</td>
+                                {% set journalEntry = latestJournalEntryByTransactionId[transaction.id]|default(null) %}
+                                <td class="text-end">
+                                    {% if journalEntry %}
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('app_journal_edit', { id: journalEntry.id }) }}">Edit</a>
+                                    {% else %}
+                                        <a class="btn btn-sm btn-outline-success" href="{{ path('app_journal_new', { transaction: transaction.id }) }}" title="Add journal entry" aria-label="Add journal entry for this transaction"><span class="fw-semibold" aria-hidden="true">+</span><span class="visually-hidden"> Journal</span></a>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -256,6 +293,39 @@
             const eventStrip = document.getElementById('chart-transaction-events');
             const candles = {{ candles|json_encode|raw }};
             const markers = {{ markers|json_encode|raw }};
+            document.querySelectorAll('[data-journal-action]').forEach((action) => {
+                action.addEventListener('click', () => {
+                    const transactionId = action.dataset.journalTransaction;
+                    document.querySelectorAll(`[data-journal-panel][data-journal-transaction="${transactionId}"]`).forEach((panel) => {
+                        panel.hidden = panel.dataset.journalPanel !== action.dataset.journalAction;
+                    });
+                    document.querySelectorAll(`[data-journal-action][data-journal-transaction="${transactionId}"]`).forEach((button) => {
+                        const actionName = button.dataset.journalAction;
+                        const active = button === action;
+                        button.classList.remove('btn-dark', 'btn-primary', 'btn-success', 'btn-outline-primary', 'btn-outline-secondary', 'btn-outline-success');
+                        button.classList.add(actionName.startsWith('edit-')
+                            ? (active ? 'btn-primary' : 'btn-outline-primary')
+                            : (actionName === 'add'
+                                ? (active ? 'btn-success' : 'btn-outline-success')
+                                : (button.dataset.journalTone === 'dark' || active ? 'btn-dark' : 'btn-outline-secondary')));
+                    });
+                });
+            });
+            document.querySelectorAll('[data-transactions-toggle]').forEach((toggle) => {
+                toggle.addEventListener('click', (event) => {
+                    event.stopPropagation();
+
+                    const card = toggle.closest('.chart-event-card');
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    card?.querySelectorAll('[data-extra-transaction]').forEach((transaction) => {
+                        transaction.hidden = expanded;
+                    });
+                    toggle.setAttribute('aria-expanded', String(!expanded));
+                    toggle.querySelector('[data-more-label]').hidden = !expanded;
+                    toggle.querySelector('[data-less-label]').hidden = expanded;
+                });
+            });
+
             const markerTimesById = new Map();
             const chartMarkers = markers.map(({ time, position, color, shape, text }, index) => {
                 const id = `transaction-marker-${index}`;

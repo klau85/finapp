@@ -167,6 +167,23 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<Transaction>
+     */
+    public function findForJournalChoices(User $user): array
+    {
+        return $this->createQueryBuilder('transaction')
+            ->addSelect('brokerAccount', 'stock')
+            ->join('transaction.brokerAccount', 'brokerAccount')
+            ->join('transaction.stock', 'stock')
+            ->andWhere('transaction.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('transaction.transactionDate', 'DESC')
+            ->addOrderBy('transaction.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * @param array{
      *     symbol?: string|null,
      *     brokerAccountId?: int|null,

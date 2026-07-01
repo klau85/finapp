@@ -123,6 +123,43 @@
                     z-index: 1;
                 }
 
+                .journal-timeline {
+                    margin-left: .5rem;
+                    padding-left: 1.75rem;
+                    position: relative;
+                }
+
+                .journal-timeline::before {
+                    background: #d1d5db;
+                    bottom: 0;
+                    content: "";
+                    left: .35rem;
+                    position: absolute;
+                    top: 0;
+                    width: 2px;
+                }
+
+                .journal-timeline-item {
+                    position: relative;
+                }
+
+                .journal-timeline-dot {
+                    background: #fff;
+                    border: 3px solid #2563eb;
+                    border-radius: 50%;
+                    height: .85rem;
+                    left: -1.82rem;
+                    position: absolute;
+                    top: 1.35rem;
+                    width: .85rem;
+                }
+
+                .badge-journal-positive { background: #dcfce7; color: #166534; }
+                .badge-journal-negative { background: #fee2e2; color: #991b1b; }
+                .badge-journal-risk { background: #fef3c7; color: #92400e; }
+                .badge-journal-info { background: #dbeafe; color: #1e40af; }
+                .badge-journal-general { background: #e5e7eb; color: #374151; }
+
                 @media (max-width: 991.98px) {
                     .app-content {
                         padding-top: 20px;
@@ -140,6 +177,7 @@
             { label: 'Dashboard', route: 'app_dashboard' },
             { label: 'Portfolio', route: 'app_portfolio' },
             { label: 'Transactions', route: 'app_transactions' },
+            { label: 'Journal', route: 'app_journal', routePrefix: 'app_journal' },
             { label: 'Upload', route: 'app_transaction_upload' },
             { label: 'Broker Accounts', route: 'app_broker_accounts' },
             { label: 'Settings', route: 'app_settings' }
@@ -157,7 +195,7 @@
                             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                                 {% for item in navItems %}
                                     <li class="nav-item">
-                                        <a class="nav-link {{ app.current_route == item.route ? 'active fw-semibold' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
+                                        <a class="nav-link {{ app.current_route == item.route or (item.routePrefix is defined and app.current_route starts with item.routePrefix) ? 'active fw-semibold' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
                                     </li>
                                 {% endfor %}
                             </ul>
@@ -170,7 +208,7 @@
                         <a class="text-white text-decoration-none fs-4 fw-semibold mb-4" href="{{ path('app_dashboard') }}">FinApp</a>
                         <nav class="nav nav-pills flex-column gap-1">
                             {% for item in navItems %}
-                                <a class="nav-link {{ app.current_route == item.route ? 'active' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
+                                <a class="nav-link {{ app.current_route == item.route or (item.routePrefix is defined and app.current_route starts with item.routePrefix) ? 'active' }}" href="{{ path(item.route) }}">{{ item.label }}</a>
                             {% endfor %}
                         </nav>
                         <div class="mt-auto pt-4">

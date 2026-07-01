@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\MarketData\MarketDataManager;
 use App\Repository\BrokerAccountRepository;
+use App\Repository\JournalEntryRepository;
 use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
 use App\Service\DecimalMath;
@@ -28,6 +29,7 @@ class DashboardController extends AbstractController
         StockRepository $stockRepository,
         PortfolioMetricsService $portfolioMetrics,
         NumberFormatExtension $formatter,
+        JournalEntryRepository $journalEntries,
     ): Response {
         $user = $this->getUser();
         \assert($user instanceof User);
@@ -70,6 +72,7 @@ class DashboardController extends AbstractController
             'brokerAllocation' => $brokerAllocation,
             'currencyExposure' => $currencyExposure,
             'metrics' => $portfolioMetrics->calculate($user, $positionsWithMarketData),
+            'recentJournalEntries' => $journalEntries->findRecentForUser($user, 3),
         ]);
     }
 

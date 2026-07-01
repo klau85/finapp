@@ -1,0 +1,3 @@
+<div class="small text-secondary">
+    {{ transaction.type|replace({'_': ' '}) }} {{ transaction.quantity|trim_number }}{% if transaction.type in ['BUY', 'SELL'] %} @ {{ transaction.price|money_symbol(transaction.currency) }}{% endif %}{% if transaction.brokerAccount %} - {{ transaction.brokerAccount.displayName }}{% endif %}
+</div>

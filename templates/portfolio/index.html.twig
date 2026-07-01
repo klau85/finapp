@@ -62,8 +62,16 @@
                 <div class="text-secondary mt-1">{{ selectedBrokerAccount.displayName }}</div>
             {% endif %}
         </div>
-        <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload transactions</a>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#portfolioJournalModal">Journal</button>
+            <a class="btn btn-dark" href="{{ path('app_transaction_upload') }}">Upload transactions</a>
+        </div>
     </div>
+
+    {% include 'journal/_portfolio_modal.html.twig' with {
+        entries: portfolioJournalEntries,
+        entryTypes: journalEntryTypes
+    } only %}
 
     <div class="card mb-4">
         <div class="card-body">
@@ -318,6 +326,25 @@
             const canvas = document.getElementById('portfolio-exposure-chart');
             const exposure = {{ exposure|json_encode|raw }};
             const numberFormat = '{{ app.user.numberFormat|default('comma_dot') }}';
+
+            document.querySelectorAll('[data-journal-action]').forEach((action) => {
+                action.addEventListener('click', () => {
+                    const context = action.dataset.journalTransaction;
+                    document.querySelectorAll(`[data-journal-panel][data-journal-transaction="${context}"]`).forEach((panel) => {
+                        panel.hidden = panel.dataset.journalPanel !== action.dataset.journalAction;
+                    });
+                    document.querySelectorAll(`[data-journal-action][data-journal-transaction="${context}"]`).forEach((button) => {
+                        const actionName = button.dataset.journalAction;
+                        const active = button === action;
+                        button.classList.remove('btn-dark', 'btn-primary', 'btn-success', 'btn-outline-primary', 'btn-outline-secondary', 'btn-outline-success');
+                        button.classList.add(actionName.startsWith('edit-')
+                            ? (active ? 'btn-primary' : 'btn-outline-primary')
+                            : (actionName === 'add'
+                                ? (active ? 'btn-success' : 'btn-outline-success')
+                                : (button.dataset.journalTone === 'dark' || active ? 'btn-dark' : 'btn-outline-secondary')));
+                    });
+                });
+            });
 
             if (!canvas || !window.Chart || exposure.length === 0) {
                 return;

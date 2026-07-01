@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Stock;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -46,6 +47,34 @@ class StockRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('stock')
             ->andWhere('stock.symbol = :symbol')
+            ->setParameter('symbol', strtoupper($symbol))
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @return list<Stock>
+     */
+    public function findForUser(User $user): array
+    {
+        return $this->createQueryBuilder('stock')
+            ->join('App\Entity\Transaction', 'transaction', 'WITH', 'transaction.stock = stock')
+            ->andWhere('transaction.user = :user')
+            ->setParameter('user', $user)
+            ->groupBy('stock.id')
+            ->orderBy('stock.symbol', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findOneForUserBySymbol(User $user, string $symbol): ?Stock
+    {
+        return $this->createQueryBuilder('stock')
+            ->join('App\Entity\Transaction', 'transaction', 'WITH', 'transaction.stock = stock')
+            ->andWhere('transaction.user = :user')
+            ->andWhere('stock.symbol = :symbol')
+            ->setParameter('user', $user)
             ->setParameter('symbol', strtoupper($symbol))
             ->setMaxResults(1)
             ->getQuery()

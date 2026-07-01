@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ pageTitle }} | FinApp{% endblock %}
+
+{% block main %}
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">Investment journal</div>
+            <h1 class="h2 mb-0">{{ pageTitle }}</h1>
+        </div>
+        <a class="btn btn-outline-secondary" href="{{ path('app_journal') }}">Cancel</a>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-4">
+            {{ form_start(form) }}
+                {{ form_errors(form) }}
+                {% if lockedTarget %}
+                    <div class="alert alert-light border mb-4">
+                        <div class="small text-secondary mb-1">Linked to</div>
+                        <strong>{{ entry.targetLabel }}</strong>
+                        {% if entry.transaction %}
+                            <div class="mt-1">
+                                {{ entry.transaction.type }} {{ entry.transaction.quantity|trim_number }} {{ entry.transaction.stock.symbol }}
+                                @ {{ entry.transaction.price|money_symbol(entry.transaction.currency) }}
+                                on {{ entry.transaction.transactionDate|date('Y-m-d') }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="d-none">{{ form_row(form.targetType) }}{{ form_row(form.stock) }}{{ form_row(form.transaction) }}</div>
+                {% else %}
+                    {{ form_row(form.targetType) }}
+                    <div data-journal-field="STOCK">{{ form_row(form.stock) }}</div>
+                    <div data-journal-field="TRANSACTION">{{ form_row(form.transaction) }}</div>
+                {% endif %}
+                <div class="row g-3">
+                    <div class="col-md-6">{{ form_row(form.entryType) }}</div>
+                    <div class="col-md-6">{{ form_row(form.entryDate) }}</div>
+                </div>
+                {{ form_row(form.title) }}
+                {{ form_row(form.content) }}
+                <button class="btn btn-dark" type="submit">Save Entry</button>
+            {{ form_end(form) }}
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const target = document.querySelector('[data-journal-target]');
+            if (!target) return;
+
+            const updateFields = () => {
+                document.querySelectorAll('[data-journal-field]').forEach((field) => {
+                    field.hidden = field.dataset.journalField !== target.value;
+                });
+            };
+
+            target.addEventListener('change', updateFields);
+            updateFields();
+        });
+    </script>
+{% endblock %}

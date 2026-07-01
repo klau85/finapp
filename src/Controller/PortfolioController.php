@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\JournalEntry;
 use App\Entity\User;
 use App\Exception\MarketDataUnavailableException;
 use App\MarketData\MarketDataManager;
 use App\MarketData\StockChartMarkerFactory;
 use App\Repository\BrokerAccountRepository;
+use App\Repository\JournalEntryRepository;
 use App\Repository\RealizedTradeRepository;
 use App\Repository\StockRepository;
 use App\Repository\TransactionRepository;
@@ -32,6 +34,7 @@ class PortfolioController extends AbstractController
         StockRepository $stockRepository,
         BrokerAccountRepository $brokerAccountRepository,
         PortfolioMetricsService $portfolioMetrics,
+        JournalEntryRepository $journalEntries,
     ): Response {
         $user = $this->getUser();
         \assert($user instanceof User);
@@ -89,6 +92,14 @@ class PortfolioController extends AbstractController
             'unavailableSymbols' => $unavailableSymbols,
             'exposure' => $this->buildExposure($positions),
             'metrics' => $portfolioMetrics->calculate($user, $positionsWithMarketData, $selectedBrokerAccount),
+            'portfolioJournalEntries' => $journalEntries->findPortfolioEntriesForUser($user),
+            'journalEntryTypes' => array_combine(
+                JournalEntry::ENTRY_TYPES,
+                array_map(
+                    static fn (string $type): string => ucwords(strtolower(str_replace('_', ' ', $type))),
+                    JournalEntry::ENTRY_TYPES,
+                ),
+            ),
             'pagination' => [
                 'currentPage' => $currentPage,
                 'totalPages' => $totalPages,
@@ -110,6 +121,7 @@ class PortfolioController extends AbstractController
         PortfolioAnalyticsService $portfolioAnalytics,
         MarketDataManager $marketDataManager,
         StockChartMarkerFactory $markerFactory,
+        JournalEntryRepository $journalEntries,
     ): Response
     {
         $user = $this->getUser();
@@ -176,6 +188,7 @@ class PortfolioController extends AbstractController
             }
 
             $history[] = [
+                'id' => $transaction->getId(),
                 'date' => $transaction->getTransactionDate()->format('Y-m-d'),
                 'brokerAccount' => $brokerAccount->getDisplayName(),
                 'symbol' => $stock->getSymbol(),
@@ -208,8 +221,21 @@ class PortfolioController extends AbstractController
             $markers = [];
         }
 
+        $journalEntriesByTransactionId = $journalEntries->findByTransactionIdsForUser(
+            $user,
+            array_values(array_filter(array_map(
+                static fn ($transaction): ?int => $transaction->getId(),
+                $transactions,
+            ))),
+        );
+        $latestJournalEntryByTransactionId = array_map(
+            static fn (array $entries): JournalEntry => $entries[0],
+            $journalEntriesByTransactionId,
+        );
+
         return $this->render('stock/show.html.twig', [
             'symbol' => $symbol,
+            'stock' => $stock,
             'companyName' => $transactions[0]->getStock()?->getCompanyName(),
             'position' => $position,
             'candles' => $candles,
@@ -217,6 +243,16 @@ class PortfolioController extends AbstractController
             'transactions' => $history,
             'timeframe' => $timeframe,
             'chartUnavailable' => $chartUnavailable,
+            'journalEntriesByTransactionId' => $journalEntriesByTransactionId,
+            'latestJournalEntryByTransactionId' => $latestJournalEntryByTransactionId,
+            'stockJournalEntries' => $journalEntries->findForStockJournal($user, $stock),
+            'journalEntryTypes' => array_combine(
+                JournalEntry::ENTRY_TYPES,
+                array_map(
+                    static fn (string $type): string => ucwords(strtolower(str_replace('_', ' ', $type))),
+                    JournalEntry::ENTRY_TYPES,
+                ),
+            ),
         ]);
     }
 

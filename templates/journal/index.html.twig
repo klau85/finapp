@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Journal | FinApp{% endblock %}
+
+{% block main %}
+    <div class="d-flex flex-column flex-md-row align-items-md-start justify-content-between gap-3 mb-4">
+        <div>
+            <div class="page-kicker">Decision history</div>
+            <h1 class="h2 mb-1">Journal</h1>
+            <p class="text-secondary mb-0">Your investment decisions, notes, and thinking over time.</p>
+        </div>
+        <a class="btn btn-dark" href="{{ path('app_journal_new') }}">+ New Entry</a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-5">
+                    <label class="form-label" for="journal-search">Search</label>
+                    <input id="journal-search" name="q" class="form-control" value="{{ search }}" placeholder="Search titles, content, or ticker">
+                </div>
+                <div class="col-lg-5">
+                    <label class="form-label" for="journal-filter">Filter</label>
+                    <select id="journal-filter" name="filter" class="form-select">
+                        {% set filters = {
+                            '': 'All',
+                            'PORTFOLIO': 'Portfolio',
+                            'STOCKS': 'Stocks',
+                            'TRANSACTIONS': 'Transactions',
+                            'BULL_THESIS': 'Bull Thesis',
+                            'BEAR_THESIS': 'Bear Thesis',
+                            'RISK': 'Risk',
+                            'REVIEW': 'Review',
+                            'RESEARCH': 'Research'
+                        } %}
+                        {% for value, label in filters %}
+                            {% set normalizedValue = value == 'STOCKS' ? 'STOCK' : (value == 'TRANSACTIONS' ? 'TRANSACTION' : value) %}
+                            <option value="{{ value }}" {{ activeFilter == normalizedValue ? 'selected' }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 d-grid">
+                    <button class="btn btn-dark" type="submit">Apply</button>
+                </div>
+                {% if search or activeFilter %}
+                    <div class="col-12"><a class="small text-secondary" href="{{ path('app_journal') }}">Clear search and filters</a></div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if entries %}
+        {% include 'journal/_timeline.html.twig' with { entries: entries } only %}
+    {% elseif search or activeFilter %}
+        <div class="card"><div class="card-body p-5 text-center"><h2 class="h5">No matching journal entries.</h2><p class="text-secondary mb-0">Try a different search or filter.</p></div></div>
+    {% else %}
+        <div class="card">
+            <div class="card-body p-5 text-center">
+                <h2 class="h4 mb-2">No journal entries yet.</h2>
+                <p class="text-secondary mb-4">Start recording why you invest, what you believe, and what you learn.</p>
+                <a class="btn btn-dark" href="{{ path('app_journal_new') }}">Create First Entry</a>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -310,7 +310,7 @@ final class MarketDataManager
 
     private function currentQuoteTtlMinutes(\DateTimeImmutable $now): int
     {
-        return $this->isUsMarketOpen($now) ? 30 : 120;
+        return $this->isUsMarketOpen($now) ? 15 : 120;
     }
 
     private function isUsMarketOpen(\DateTimeImmutable $now): bool
