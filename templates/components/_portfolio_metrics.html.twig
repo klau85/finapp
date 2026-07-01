@@ -39,7 +39,7 @@
 
     {% for card in cards %}
         <div class="col">
-            <div class="card metric-card summary-metric-card h-100">
+            <div class="card metric-card summary-metric-card h-100 {{ loop.first ? 'portfolio-value-card' }}">
                 <div class="card-body">
                     <div class="text-secondary mb-2 metric-label" data-bs-toggle="tooltip" data-bs-placement="top" title="{{ card.tooltip }}">{{ card.label }}</div>
                     {% if card.values %}

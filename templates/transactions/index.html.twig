@@ -119,7 +119,7 @@
                                     </td>
                                     <td class="text-end">{{ row.totalAmount|money_symbol(transaction.currency) }}</td>
                                     <td class="text-end">
-                                        <a class="btn btn-sm btn-outline-success me-1" href="{{ path('app_journal_new', { transaction: transaction.id }) }}" title="Add journal entry" aria-label="Add journal entry for this transaction"><span class="fw-semibold" aria-hidden="true">+</span><span class="visually-hidden"> Journal</span></a>
+                                        <a class="btn btn-sm btn-outline-success me-1" href="{{ path('app_journal_new', { transaction: transaction.id }) }}" title="Add journal entry" aria-label="Add journal entry for this transaction">Add</a>
                                         <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTransaction{{ transaction.id }}">
                                             Delete
                                         </button>

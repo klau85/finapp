@@ -57,12 +57,12 @@
             <h1 class="h2 mb-0">{{ symbol }}</h1>
             <div class="text-secondary">{{ companyName ?: symbol }}</div>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
             <div class="btn-group" role="group" aria-label="Chart timeframe">
-                <a class="btn btn-sm {{ timeframe == 'daily' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'daily' }) }}">1D</a>
-                <a class="btn btn-sm {{ timeframe == 'weekly' ? 'btn-dark' : 'btn-outline-secondary' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'weekly' }) }}">1W</a>
+                <a class="btn btn-sm btn-outline-secondary {{ timeframe == 'daily' ? 'active' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'daily' }) }}" aria-current="{{ timeframe == 'daily' ? 'page' : 'false' }}">1D</a>
+                <a class="btn btn-sm btn-outline-secondary {{ timeframe == 'weekly' ? 'active' }}" href="{{ path('app_stock_show', { symbol: symbol, timeframe: 'weekly' }) }}" aria-current="{{ timeframe == 'weekly' ? 'page' : 'false' }}">1W</a>
             </div>
-            <button class="btn btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#stockJournalModal">Journal</button>
+            <button class="btn btn-sm btn-dark" type="button" data-bs-toggle="modal" data-bs-target="#stockJournalModal">Journal</button>
         </div>
     </div>
 
@@ -88,24 +88,13 @@
                             </div>
                                 {% for detail in marker.details %}
                                     {% set transactionId = marker.transactionIds[loop.index0] %}
-                                    <div
-                                        class="{{ not loop.first ? 'mt-3 pt-3 border-top' }}"
-                                        {% if not loop.first %}data-extra-transaction hidden{% endif %}
-                                    >
+                                    <div class="{{ not loop.first ? 'mt-3 pt-3 border-top' }}">
                                         <div class="d-flex align-items-center justify-content-between gap-2">
                                             <div class="chart-event-detail">{{ detail }}</div>
                                             <button type="button" class="btn btn-sm btn-dark flex-shrink-0" data-bs-toggle="modal" data-bs-target="#transactionJournal{{ transactionId }}">Journal</button>
                                         </div>
                                     </div>
                                 {% endfor %}
-                                {% if marker.details|length > 1 %}
-                                    <div class="mt-3">
-                                        <button type="button" class="btn btn-sm btn-link px-0 text-decoration-none" data-transactions-toggle aria-expanded="false">
-                                            <span data-more-label>More</span>
-                                            <span data-less-label hidden>Less</span>
-                                        </button>
-                                    </div>
-                                {% endif %}
                         </template>
                     {% endfor %}
                 </div>
@@ -126,9 +115,9 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="card metric-card">
+            <div class="card metric-card portfolio-value-card">
                 <div class="card-body">
-                    <div class="text-secondary mb-2">Total Shares</div>
+                    <div class="text-secondary mb-2 metric-label">Total Shares</div>
                     <div class="h3 mb-0">{{ position ? position.totalShares|trim_number : '0' }}</div>
                 </div>
             </div>
@@ -283,7 +272,7 @@
                                     {% if journalEntry %}
                                         <a class="btn btn-sm btn-outline-primary" href="{{ path('app_journal_edit', { id: journalEntry.id }) }}">Edit</a>
                                     {% else %}
-                                        <a class="btn btn-sm btn-outline-success" href="{{ path('app_journal_new', { transaction: transaction.id }) }}" title="Add journal entry" aria-label="Add journal entry for this transaction"><span class="fw-semibold" aria-hidden="true">+</span><span class="visually-hidden"> Journal</span></a>
+                                        <a class="btn btn-sm btn-outline-success" href="{{ path('app_journal_new', { transaction: transaction.id }) }}" title="Add journal entry" aria-label="Add journal entry for this transaction">Add</a>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -332,16 +321,6 @@
                     return;
                 }
 
-                const toggle = event.target.closest('[data-transactions-toggle]');
-                if (toggle) {
-                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
-                    transactionOverlay.querySelectorAll('[data-extra-transaction]').forEach((transaction) => {
-                        transaction.hidden = expanded;
-                    });
-                    toggle.setAttribute('aria-expanded', String(!expanded));
-                    toggle.querySelector('[data-more-label]').hidden = !expanded;
-                    toggle.querySelector('[data-less-label]').hidden = expanded;
-                }
             });
 
             const markerDataById = new Map();
