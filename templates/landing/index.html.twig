@@ -1,10 +1,10 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}FinApp | Understand Your Portfolio{% endblock %}
+{% block title %}NorthLens | Understand Your Portfolio{% endblock %}
 
 {% block stylesheets %}
     {{ parent() }}
-    <link rel="stylesheet" href="{{ asset('css/landing.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/landing.css') }}?v=20260701-2">
 {% endblock %}
 
 {% block body %}
@@ -12,9 +12,9 @@
         <header class="landing-header sticky-top">
             <nav class="navbar navbar-expand-lg" aria-label="Main navigation">
                 <div class="container landing-container">
-                    <a class="navbar-brand landing-brand" href="{{ path('app_home') }}" aria-label="FinApp home">
+                    <a class="navbar-brand landing-brand" href="{{ path('app_home') }}" aria-label="NorthLens home">
                         <span class="landing-brand-mark" aria-hidden="true"><span></span></span>
-                        FinApp
+                        NorthLens
                     </a>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#landingNavbar" aria-controls="landingNavbar" aria-expanded="false" aria-label="Toggle navigation">
                         <span class="navbar-toggler-icon"></span>
@@ -27,7 +27,7 @@
                         </ul>
                         <div class="landing-nav-actions d-flex flex-column flex-lg-row gap-2">
                             {% if app.user %}
-                                <a class="btn btn-dark" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
+                                <a class="btn btn-success" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
                             {% else %}
                                 <a class="btn btn-link landing-login" href="{{ path('app_login') }}">Login</a>
                                 <a class="btn btn-dark" href="{{ path('app_register') }}">Create Free Account</a>
@@ -120,7 +120,7 @@
                     <div class="landing-product-preview" aria-label="Example portfolio dashboard">
                         <div class="landing-preview-toolbar">
                             <div>
-                                <div class="landing-preview-brand">FinApp</div>
+                                <div class="landing-preview-brand">NorthLens</div>
                                 <div class="landing-preview-date">Portfolio overview &middot; June 2026</div>
                             </div>
                             <div class="landing-preview-avatar">AC</div>
@@ -162,6 +162,16 @@
                                         </svg>
                                         <span class="landing-chart-marker landing-marker-buy">BUY</span>
                                         <span class="landing-chart-marker landing-marker-sell">SELL</span>
+                                        <article class="landing-transaction-card landing-transaction-buy">
+                                            <div><span>May 12, 2025</span><strong>BUY</strong></div>
+                                            <b>10 NVDA @ $118.40</b>
+                                            <small>XTB Main Account</small>
+                                        </article>
+                                        <article class="landing-transaction-card landing-transaction-sell">
+                                            <div><span>Mar 18, 2026</span><strong>SELL</strong></div>
+                                            <b>4 NVDA @ $164.20</b>
+                                            <small>Revolut Stocks</small>
+                                        </article>
                                     </div>
                                 </div>
                             </div>
@@ -286,7 +296,8 @@
                             'Stock chart transaction markers',
                             'Portfolio exposure',
                             'Broker account breakdown',
-                            'Transaction history'
+                            'Transaction history',
+                            'Investment decision journal'
                         ] %}
                             <div><span aria-hidden="true">&#10003;</span>{{ feature }}</div>
                         {% endfor %}
@@ -309,7 +320,6 @@
                                 {% for item in [
                                     'AI Portfolio Review',
                                     'Anonymous community insights',
-                                    'Trade journal and notes',
                                     'More broker integrations'
                                 ] %}
                                     <article><span>{{ loop.index < 10 ? '0' ~ loop.index : loop.index }}</span><h3>{{ item }}</h3></article>
@@ -346,7 +356,7 @@
                     <p>Start by importing your transactions and seeing your portfolio clearly.</p>
                     <div class="d-flex flex-column flex-sm-row justify-content-center gap-3">
                         {% if app.user %}
-                            <a class="btn btn-dark btn-lg" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
+                            <a class="btn btn-success btn-lg" href="{{ path('app_dashboard') }}">Go to Dashboard</a>
                         {% else %}
                             <a class="btn btn-dark btn-lg" href="{{ path('app_register') }}">Create Free Account</a>
                             <a class="btn btn-outline-dark btn-lg" href="{{ path('app_login') }}">Login</a>
@@ -358,7 +368,7 @@
 
         <footer class="landing-footer">
             <div class="container landing-container d-flex flex-column flex-sm-row align-items-center justify-content-between gap-3">
-                <a class="landing-brand" href="{{ path('app_home') }}"><span class="landing-brand-mark" aria-hidden="true"><span></span></span>FinApp</a>
+                <a class="landing-brand" href="{{ path('app_home') }}"><span class="landing-brand-mark" aria-hidden="true"><span></span></span>NorthLens</a>
                 <span>Portfolio clarity for long-term investors.</span>
             </div>
         </footer>

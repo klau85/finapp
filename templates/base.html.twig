@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{% block title %}FinApp{% endblock %}</title>
+        <title>{% block title %}NorthLens{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f2937'/%3E%3Cpath d='M15 42h34M18 36l8-8 7 6 13-15' stroke='%2322c55e' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
         {% block stylesheets %}
             <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -255,7 +255,7 @@
             <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
         {% endblock %}
     </head>
-    <body class="{{ app.user ? 'app-admin' : 'app-public' }}">
+    <body class="{{ app.user and app.current_route != 'app_home' ? 'app-admin' : 'app-public' }}">
         {% set navItems = [
             { label: 'Dashboard', route: 'app_dashboard' },
             { label: 'Portfolio', route: 'app_portfolio' },
@@ -270,7 +270,7 @@
             {% if app.user %}
                 <nav class="navbar navbar-expand-lg bg-white app-mobile-nav d-lg-none">
                     <div class="container-fluid">
-                        <a class="navbar-brand fw-semibold" href="{{ path('app_dashboard') }}">FinApp</a>
+                        <a class="navbar-brand fw-semibold" href="{{ path('app_dashboard') }}">NorthLens</a>
                         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mobileNav" aria-controls="mobileNav" aria-expanded="false" aria-label="Toggle navigation">
                             <span class="navbar-toggler-icon"></span>
                         </button>
@@ -288,7 +288,7 @@
                 </nav>
                 <div class="app-shell d-lg-flex">
                     <aside class="app-sidebar d-none d-lg-flex flex-column p-4">
-                        <a class="app-brand text-decoration-none fs-4 fw-semibold mb-4" href="{{ path('app_dashboard') }}">FinApp</a>
+                        <a class="app-brand text-decoration-none fs-4 fw-semibold mb-4" href="{{ path('app_dashboard') }}">NorthLens</a>
                         <nav class="nav nav-pills flex-column gap-1">
                             {% for item in navItems %}
                                 <a class="nav-link {{ app.current_route == item.route or (item.routePrefix is defined and app.current_route starts with item.routePrefix) ? 'active' }}" href="{{ path(item.route) }}">{{ item.label }}</a>

@@ -155,9 +155,13 @@ body {
     margin: 3rem 0 1rem;
 }
 
-.landing-hero .btn-success {
+.landing-page .btn-success,
+.landing-page .btn-success:hover,
+.landing-page .btn-success:focus,
+.landing-page .btn-success:active {
     background: var(--landing-green);
     border-color: var(--landing-green);
+    color: #ffffff;
 }
 
 .landing-hero-note {
@@ -485,6 +489,62 @@ body {
     background: var(--landing-red);
     right: 20%;
     top: 58px;
+}
+
+.landing-transaction-card {
+    background: #ffffff;
+    border: 1px solid var(--landing-line);
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(21, 26, 30, .12);
+    display: grid;
+    gap: 4px;
+    padding: 9px 10px;
+    position: absolute;
+    width: 174px;
+    z-index: 3;
+}
+
+.landing-transaction-card > div {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+}
+
+.landing-transaction-card span,
+.landing-transaction-card small {
+    color: var(--landing-muted);
+    font-size: .62rem;
+}
+
+.landing-transaction-card strong {
+    border-radius: 3px;
+    font-size: .58rem;
+    padding: 2px 5px;
+}
+
+.landing-transaction-card b {
+    color: var(--landing-ink);
+    font-size: .72rem;
+}
+
+.landing-transaction-buy {
+    bottom: 4px;
+    left: 4%;
+}
+
+.landing-transaction-buy strong {
+    background: var(--landing-green-soft);
+    color: var(--landing-green);
+}
+
+.landing-transaction-sell {
+    right: 3%;
+    top: 4px;
+}
+
+.landing-transaction-sell strong {
+    background: #fde9ea;
+    color: var(--landing-red);
 }
 
 .landing-exposure-list {
@@ -859,6 +919,15 @@ body {
 
     .landing-chart-canvas {
         height: 190px;
+    }
+
+    .landing-transaction-card {
+        padding: 7px 8px;
+        width: 148px;
+    }
+
+    .landing-transaction-card small {
+        display: none;
     }
 
     .landing-import-card {
